@@ -7,7 +7,7 @@ Pág (PDF),Capítulo,Comentario,Corregido,Notas
 37,3. Parte central,"""responsabilidad creativa"" hay que definirlo y citar algo, puede ser esto: https://ebooks.iospress.nl/doi/10.3233/978-1-61499-098-7-21",FALSE,
 37,3. Parte central,"En ""Sistema de representaci´on estructurada"" refieren dos veces a la 3.2.2 ¿está bien eso? Si es así, no lo hagan; reacomoden el párrafo para que se refiera solo una vez. De no ser así, corrijan la referencia :)",FALSE,
 37,3. Parte central,"Es un poco raro que mencionen el objetivo ""SOLVE_MYSTERY"" cuando no mencionan a los otros, no dicen cuántos son en total, ni tampoco explican más sobre ese SOLVE_MYSTERY.",FALSE,
-38,3. Parte central,"De nuevo hay ejemplos entre paréntesis sin el ""p. ej.:""",FALSE,
+38,3. Parte central,"De nuevo hay ejemplos entre paréntesis sin el ""p. ej.:""",TRUE,FASE 3: Agregado 'p. ej.:' a ~20 instancias de listas en paréntesis
 38,3. Parte central,"""detallado en la sección XX"" -- faltó enlazar la seccion ahi, y métanle un futuro explícito ""que será detallado""",FALSE,
 38,3. Parte central,"""puzle"" es la palabra en español. Si quieren usar la palabra en inglés (puzzle), pónganlo en cursiva",FALSE,
 38,3. Parte central,"""MongoDB resulto ser mas que una simple funcionalidad de almacenamiento"" -- lenguaje marketingero: bajarle el tono. En general, si dicen ""La persistencia de mundos generados mediante MongoDB"" y enganchan de una con ""proporcionó capacidades de reproducibilidad"".... ya queda bien",FALSE,
@@ -21,7 +21,7 @@ Pág (PDF),Capítulo,Comentario,Corregido,Notas
 38,3. Parte central,"Mencionan de nuevo lo de la ""sobrecarga cognitiva del modelo"". Es raro eso, nunca lo había leído. Cámbienlo o citen de dónde sale. Me da la impresión de que están queriendo decir algo que puede ser definido/indicado en palabras simples",FALSE,
 38,3. Parte central,"Che, por qué ponen este título en el párrafo? ""Motivación del diseño por etapas"". No es la primera vez que lo veo en los proyectos de grado de este año (antes no pasaba) ¿Es que GPT les sugiere ese estilo de escritura? Ese título no es necesario y está rompiendo el flujo de lectura. Fíjense que lo último que dicen en el párrafo anterior es lo de las 5 etapas, y al ver un título en negrita el lector va a pensar que esta es la primera etapa....y no.
 
-... ¿o es que el template que dan en el EVA de proyecto de grado tiene subsubsecciones con ese formato? No las usen, es confuso.",FALSE,
+... ¿o es que el template que dan en el EVA de proyecto de grado tiene subsubsecciones con ese formato? No las usen, es confuso.",TRUE,FASE 3: Eliminados TODOS los \paragraph y \subparagraph (~55 títulos) - integrados en texto con conectores
 38,3. Parte central,"Ahora veo que lo que comenté arriba es lo que les pedí en el inicio de la 3.2.1: la descripción de los experimentos preliminares. Todo esto va ahi, al inicio. Y luego ya dicen lo del pipeline en 5 etapas y se meten de una a describirlas. Hacer esto, de anunciar una cosa, pasar a otra, y volver para atrás, para luego seguir con lo otro (A B A B) confunde muchísimo al lector.",TRUE,"FASE 1: Reorganizado flujo del Pipeline - experimentos preliminares al inicio, luego pipeline completo sin saltos"
 39,3. Parte central,"""alcanz´abamos repetidamente el l´ımite de caracteres "" --- de caracteres o de tokens? (capaz que está bien caracteres, no digo que no, sólo lo dejo acá para que lo revisen)",FALSE,
 39,3. Parte central,"""Para investigar estos problemas"" --> ""Para entender y caracterizar mejor estos problemas""                                       investigar es una palabra más dura",FALSE,
@@ -35,7 +35,7 @@ Pág (PDF),Capítulo,Comentario,Corregido,Notas
 40,3. Parte central,"""(en modo Inspiration) "" --> ""(en el modo Inspiration)"" o ""(para el modo Inspiration)"".  Aplica lo mismo para cuando hablan del modo Generate",FALSE,
 40,3. Parte central,"""Contexto narrativo que motiva la acci´on"" ----¿Qué acción? (me puse en modo ""pregunta del tribunal"")",FALSE,
 40,3. Parte central,""" se crea primero el “porqué"" ---> ""se crea primero el por qué""",FALSE,
-40,3. Parte central,""" ambientaci´on (medieval, ciencia ficci´on, moderna, fant´astica)"" --- ¿Esto es exhaustivo? Si son solo ejemplos, recuerden poner ""p. ej.:"". Aplica el mismo comentario para las categorías temáticas que nombran luego",FALSE,
+40,3. Parte central,""" ambientaci´on (medieval, ciencia ficci´on, moderna, fant´astica)"" --- ¿Esto es exhaustivo? Si son solo ejemplos, recuerden poner ""p. ej.:"". Aplica el mismo comentario para las categorías temáticas que nombran luego",TRUE,FASE 3: Agregado 'p. ej.:' correctamente
 41,3. Parte central,"""Para resolver este problema, diseñamos"" --- esto no va en un párrafo aparte, porque es parte de lo que vienen describiendo en ""Modo Inspiration - Adherencia temática estricta""",FALSE,
 41,3. Parte central,"""El tema proporcionado debe ser la base fundamental de TODO el concepto del mundo"" --- no va la mayúscula ahí. Pueden usar subrayado si quieren",FALSE,
 41,3. Parte central,"""deben ser manifestaciones directas del tema"" --- ¿""manifestraciones"" es la palabra?",FALSE,
@@ -74,7 +74,7 @@ Pág (PDF),Capítulo,Comentario,Corregido,Notas
 45,3. Parte central,De nuevo hay paréntesis que no se sabe si lista elementos exhaustivamente o ejemplos,FALSE,
 45,3. Parte central,"De nuevo hay secciones sin enlazar con ""XX""",FALSE,
 46,3. Parte central,"De nuevo hablan de los desafios ""flotantes"". Hay que definir bien esto porque lo usan muchas veces. Quizás vale la pena decir que cuando uno dice ""blablalblbal CONCEPTO (definicion timida)"" o ""balbalbalbal definicion timida (CONCEPTO)"" no consideramos que el concepto fue definido. Para que el lector se de cuenta posta que el concepto es importante hay que darle un papel protagonico en la escritura",FALSE,
-46,3. Parte central,"""se establecieron reglas espec´ıficas"" --- no cambien a voz pasiva de repente, proque estan usando la primera persona del plural, asi que va ""establecimos"". Dejo alerta",FALSE,
+46,3. Parte central,"""se establecieron reglas espec´ıficas"" --- no cambien a voz pasiva de repente, proque estan usando la primera persona del plural, asi que va ""establecimos"". Dejo alerta",TRUE,FASE 3: Corregido a voz activa primera persona plural en ~5 instancias
 46,3. Parte central,"De nuevo hay un título en el párrafo. Sáquenlo e hilen ",FALSE,
 46,3. Parte central,"De nuevo hay secciones sin enlazar con ""XX""",FALSE,
 46,3. Parte central,"""dado que el motor del juego no admite funciones de crafting"" -- es innecesario usar el concepto de crafting cuando ya antes lo están explicando (y no usan el concepto en otro lado)",FALSE,
@@ -184,7 +184,7 @@ Dicho eso, sigo pensando que el lector va a poder entender (y disfrutar) más si
 ",FALSE,
 58,3. Parte central,"""Las mec´anicas de “fusi´on” o “combinaci´on” de objetos no exist´ıan en el motor del juego (no hay sistema de crafting"" --- saquen lo de los paréntesis y agreguen una aclaración antes, tipo ""Como mencionamos previamente, PAYADOR no cuenta con una transformación para combinar objetos y crear otros""",FALSE,
 58,3. Parte central,""" implementar un tipo get_items "" ----- aclaren que es un ""tipo de objetivo""",FALSE,
-58,3. Parte central,"""e.g."" --> ""p. ej.:""              a mí me encanta el e.g. pero en español no se usa tanto: https://www.fundeu.es/consulta/por-ejemplo-1687/",FALSE,
+58,3. Parte central,"""e.g."" --> ""p. ej.:""              a mí me encanta el e.g. pero en español no se usa tanto: https://www.fundeu.es/consulta/por-ejemplo-1687/",TRUE,FASE 3: Cambiado a 'p. ej.:'
 58,3. Parte central,"Cuando hablan de los cambios que hicieron al prompt para que limite la complejidad de los objetivos, metan enlace al anexo donde van a estar las prompts. Me imagino que van a tener una sección por prompt, así que pueden poner directo el enlace a la sección del anexo de prompts donde esté esta. Si necesitan referencia sobre cómo armar el anexo de prompts fíjense en mi tesis. Ahí use ""lstlisting"": https://www.overleaf.com/learn/latex/Code_listing",TRUE,"FASE 2: Anexo de prompts creado con lstlisting, incluye sección para cada paso del pipeline con referencias"
 59,3. Parte central,""" crear un quick action"" --- expliquen qué es esto. Si es de la UI, saquenlo y agréguenlo para esa sección, o al menos dejen un puntero. Si es otra cosa, explíquenlo",FALSE,
 59,3. Parte central,"""objective.description"" se sale del márgen por el entorno de matemática",FALSE,
@@ -200,7 +200,7 @@ Fíjense que en el ""tiempo de lectura"" es un poco raro que les estén contando
 59,3. Parte central,"""que se verifican mediante condiciones directas"" ---- no me quedó claro cuál distinción hacen ahí ¿qué es una condición directa? Y de nuevo (ah re pesadoh el santigon bohhh): ¿eso que está entre paréntesis es exhaustivo o ejemplos?",FALSE,
 59,3. Parte central,"""el sistema (no el LLM) detecta la interaccion "" --- Comentario que me hizo Lara (la revisora): ""¿pero el LLM no es parte del sistema también?"" .... tiene razón jajajaja. Así que intenten decir algo como ""la parte simbólica del sistema"" o ""se verifica lógicamente en el sistema""",FALSE,
 60,3. Parte central,"""su relevancia al misterio, "" --- aclaren qué es el misterio acá, porque puede parecer como que están informalmente hablando de ""el misterio de la peli""",FALSE,
-60,3. Parte central,"""y el progreso actual (X/N pistas descubiertas)"" --- cambien eso entre paréntesis por un ejemplo concreto entre paréntesis que sea representativo, onda ""(""p. ej.: 2 de 4 pistas descubiertas"")"". Recuerden que el ejemplo va entre comillas porque es una cita textual de lo que diría la UI, y no es un ejemplo abstracto ",FALSE,
+60,3. Parte central,"""y el progreso actual (X/N pistas descubiertas)"" --- cambien eso entre paréntesis por un ejemplo concreto entre paréntesis que sea representativo, onda ""(""p. ej.: 2 de 4 pistas descubiertas"")"". Recuerden que el ejemplo va entre comillas porque es una cita textual de lo que diría la UI, y no es un ejemplo abstracto ",TRUE,FASE 3: Agregado ejemplo concreto con 'p. ej.:'
 60,3. Parte central,"""Las reglas especiales en el prompt para objetivos de misterio incluyen"" --- denle un poco más de cariño a esto, tipo ""Al igual que hicimos para los puzzles, también incluimos reglas especiales en el prompt para favorecer que los objetivos de misterios se generen correctamente"" ... o lo que les guste",FALSE,
 60,3. Parte central,"""El objetivo debe incluir "" --- no queda claro qué quiere decir ""debe incluir"" en este caso. Explíquen más, sobre si es algo relacionado a un ""id"", a un atributo de tipo ""name"", o a qué específicamente",FALSE,
 60,3. Parte central,"""NO"" en mayúsculas no va. Redáctenlo mejor, como ""En este caso no se usa (...)"". ",FALSE,
@@ -264,7 +264,7 @@ Además, está escrito en modo oral: agreguen enganches. Les dejo una reescritur
 63,3. Parte central,"""y en particular con la nueva versi´on de PAYADOR"" ---> ""y en particular porque nuestro sistema NOMBRE_DEL_SISTEMA presenta requisitos que no satisface la versión original de PAYADOR, que fue construida lo más mínima posible para ser expandida""",FALSE,
 63,3. Parte central,"""o por lo menos implica una dificultad extra no menor"" ---- muy informal. Lo pueden sacar y se entiende perfecto",FALSE,
 63,3. Parte central,"""un sistema de modelos estructurados con Pydantic""  ----> ""usando los LLMs junto a la biblioteca Pydantic, para que su salida respete una estructura determinada""",FALSE,
-63,3. Parte central,"Eviten usar el ""etc."" cuando la secuencia no es obvia",FALSE,
+63,3. Parte central,"Eviten usar el ""etc."" cuando la secuencia no es obvia",TRUE,FASE 3: Eliminado 'etc.' en secuencias no obvias
 63,3. Parte central,"""fragil"" --> ""frágil""",FALSE,
 63,3. Parte central,"Acabo de googlear y ver que ""model"" en Pydantic es algo especifico, y que cunando dicen ""modelos Pydantic"" se están refiriendo a eso. Eso tienen que definirlo en el marco teórico. De todos modos, diría que metan link en un footnote a: https://docs.pydantic.dev/latest/concepts/models/",TRUE,"FASE 2: Agregada nota al pie explicando Pydantic como biblioteca de validación de datos con anotaciones de tipo, con referencia a documentación oficial"
 63,3. Parte central,"""permitiendo rechazar salidas malformadas antes de que lleguen al motor."" --- el tribunal les puede preguntar ""Y si no tienen la forma correcta ¿Pydantic autónomamente reintenta la llamada al LLM?"". Aclaren esto en el documento",FALSE,
@@ -307,7 +307,7 @@ Capítulo: Implementación
 66,3. Parte central,"""output_dimensionality"" se va de margen",FALSE,
 66,3. Parte central,"""como recomienda la documentaci´on de Gemini""---- metan footnote con link a esa parte especifica de la documentacion ",FALSE,
 66,3. Parte central,"""La elecci´on de embeddings sobre b´usqueda l´exica tradicional"" --- es muy oral. Expandan: ""La decisión de usar word embeddings por sobre métodos de búsqueda léxica tradicional""",FALSE,
-66,3. Parte central,"""(palabras claves, BM25)"" ---- aca son ejemplos, así que pongan ""(p. ej.: usando palabras clave, o el algoritmo BM25)""",FALSE,
+66,3. Parte central,"""(palabras claves, BM25)"" ---- aca son ejemplos, así que pongan ""(p. ej.: usando palabras clave, o el algoritmo BM25)""",TRUE,FASE 3: Agregado 'p. ej.:' correctamente
 66,3. Parte central,"""El beneficio principal que observamos es relativo a la narraci´on, donde se nota"" --- Esto es un buen ejemplo para ilustrar la falta de jerarquización que tienen en este capítulo 3. Esto es un mensaje re importante sobre la percepción que tienen ustedes sobre haber incluido RAG. No debería estar ahí perdido en la nada. Tiene que estar bien enfatizado, bien presente. Que resalte. También pueden dejarlo para el final de esta subsección, como un mensaje final, luego de haber presentado cómo funcionan todas las partes de RAG",FALSE,
 67,3. Parte central,"Che, no queda claro qué es ""Cada memoria"". Sé que lo dije antes, pero lo nuevo que aporta este comentario es: definan bien qué es una memoria. ¿Es el string sumado del string del jugador y del GM en un turno? ¿Es solo el string del jugador? ¿Es solo el string del GM?",FALSE,
 67,3. Parte central,"""format_memories_for_prompt"" --- se sale de margen",FALSE,
