@@ -1,0 +1,879 @@
+\chapter{Parte Central} \label{cap:central}
+Este capítulo detalla el proceso completo de diseño, implementación y validación del sistema de generación automática de mundos interactivos desarrollado como extensión de Payador. El desarrollo abordó un desafío técnico complejo: permitir que modelos de lenguaje generen mundos narrativos coherentes, estructuralmente válidos y jugables, intentando mantener o mejorar la experiencia de juego que ofrece el sistema actual.
+
+\section{Visión General del Sistema}
+El sistema que desarrollamos extiende Payador transformándolo de un motor de juegos con mundos predefinidos a una plataforma capaz de generar mundos interactivos de forma automática. La arquitectura resultante integra varios componentes que trabajan en conjunto para resolver los desafíos técnicos y de diseño que surgieron durante el desarrollo.
+
+\textbf{Motor de generación basado en LLM}: Utiliza un pipeline incremental de cinco etapas que descompone la creación del mundo en tareas específicas. Este enfoque surgió como solución a problemas críticos observados en aproximaciones más directas, como veremos en detalle en la sección \ref{sec:pipeline_incremental}. El motor puede generar mundos con responsabilidad creativa total o guiados por semillas (\textit{seeds}) proporcionadas por el usuario.
+
+\textbf{Sistema de representación estructurada}: Define esquemas de datos mediante Pydantic que garantizan la validez estructural de los mundos generados. Desarrollamos taxonomías completas tanto para objetivos como para puzzles, cada una con consideraciones específicas de implementación. Particularmente, el tipo de objetivo \verb|SOLVE_MYSTERY| requirió un tratamiento especial que se detalla en la sección \ref{subsec:objetivos_misterio}, mientras que los siete tipos de puzzles definidos se analizan en la sección \ref{subsec:puzzles} referente a este tema.
+
+\textbf{Sistema de asistencia adaptativo}: Implementamos un mecanismo dinámico de pistas (\textit{hints}) que adapta las sugerencias según la situación inmediata del jugador. Si el jugador está en una ubicación sin puzzles, el sistema ofrece pistas relacionadas con el objetivo principal. Si hay un puzzle en la ubicación pero no ha sido presentado, las pistas sugieren explorar e interactuar con elementos del entorno (``mira y observa'', ``intenta hablar con el personaje''). Una vez que el puzzle ha sido propuesto y el jugador no lo ha resuelto, las pistas cambian automáticamente a las específicas de ese puzzle, proporcionando ayuda progresiva. Este mecanismo, detallado en la sección XX, fue crucial para mejorar la experiencia de usuario sin comprometer el desafío.
+
+\textbf{Integración con MongoDB}: La persistencia de mundos generados mediante MongoDB resultó ser más que una simple funcionalidad de almacenamiento. Este componente proporcionó capacidades de reproducibilidad que fueron fundamentales tanto para el modo \textbf{Replay} (permitiendo a usuarios rejugar mundos propios o ajenos) como para el proceso de debugging y validación durante el desarrollo. La capacidad de recuperar mundos exactos con problemas específicos aceleró significativamente la identificación y corrección de errores en el pipeline de generación, como se describe en la sección \ref{subsec:mongodb}.
+
+\textbf{Interfaz de juego mejorada}: Esta nueva interfaz, usando \textit{Streamlit}, nos permite elegir entre cinco modos de juego (Preset, Generate, Inspiration, Tutorial, Replay), además de la posibilidad de tener herramientas de depuración para análisis de mundos, sistema de acciones rápidas, visualización estructurada del objetivo, y soporte multilingüe completo. Los detalles de diseño de la interfaz y las decisiones de experiencia de usuario se presentan en la sección XX.
+
+\textbf{Sistema de validación multinivel}: Implementamos capas de validación que verifican la jugabilidad de los mundos generados, desde consistencia referencial hasta accesibilidad de objetivos. Estas validaciones, que se ejecutan entre etapas del pipeline de generación, se describen en profundidad en la sección XX.
+
+La Figura \ref{fig:flujo_general} muestra el flujo general del sistema, ilustrando cómo estos componentes interactúan desde la configuración inicial hasta la interacción del jugador con el mundo generado, incluyendo el ciclo de persistencia y recuperación desde MongoDB.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figs/generation-pipeline.png}
+    \caption{Flujo general del sistema}
+    \label{fig:flujo_general}
+\end{figure}
+
+
+
+\section{Arquitectura del Sistema}
+
+\subsection{Pipeline de Generación Incremental} \label{sec:pipeline_incremental}
+
+La generación de mundos mediante un único llamado al LLM (estrategia \textit{one-shot}) presentó problemas significativos durante las pruebas iniciales: sobrecarga cognitiva del modelo, inconsistencias narrativas y desconexión entre elementos del mundo. Para resolver estos problemas, diseñamos una \textbf{Estrategia de Generación Incremental y Guiada} que divide la creación en cinco etapas secuenciales, cada una con una responsabilidad específica.
+
+\paragraph{Motivación del diseño por etapas} La estrategia \textit{one-shot} requiere que el LLM genere simultáneamente la historia, objetivos, elementos del mundo, personajes y sus interrelaciones, lo cual excede la capacidad de procesamiento coherente del modelo en una única invocación. Durante la experimentación con este enfoque, observamos problemas recurrentes que comprometían la jugabilidad:
+
+\begin{itemize}
+    \item \textbf{Objetos críticos sin ubicación}: El LLM frecuentemente olvidaba colocar objetos necesarios para completar el objetivo en ubicaciones específicas del mundo, dejándolos ``flotando'' sin una posición definida o directamente omitiéndolos de la estructura del mundo.
+    \item \textbf{NPCs sin contexto espacial}: Personajes importantes para la narrativa se generaban sin asignación a ninguna ubicación, imposibilitando la interacción con ellos.
+    \item \textbf{Desconexión entre narrativa y estructura}: El trasfondo mencionaba elementos que luego no existían en el mundo jugable, o viceversa.
+    \item \textbf{Límites de longitud de prompt}: Al intentar mitigar estos problemas agregando instrucciones más detalladas y explícitas al prompt, alcanzábamos repetidamente el límite de caracteres permitido por las APIs de los LLMs, sin que esto garantizara mejoras en la consistencia.
+\end{itemize}
+
+Para investigar estos problemas, realizamos un experimento controlado: en lugar de solicitar al LLM que generara todo el mundo de una vez, le proporcionamos manualmente una descripción narrativa (\textit{backstory}) completa y detallada, inspirada en uno de los mundos originales de Payador (el mundo de la tortuga). A partir de esta descripción en lenguaje natural, solicitamos al LLM que construyera la estructura del mundo. \textbf{Los resultados fueron significativamente superiores}: el LLM logró crear un mundo considerablemente más consistente, con la mayoría de los elementos correctamente ubicados y conectados lógicamente. Si bien el enfoque incremental no elimina completamente los errores de generación (particularmente en mundos de alta complejidad donde el LLM ocasionalmente puedesi omitir elementos o crear inconstencias) la frecuencia y severidad de estos problemas se redujo drásticamente en comparación con el enfoque \textit{one-shot}.
+
+Este resultado reveló que el problema principal no era la capacidad del LLM para estructurar mundos coherentes, sino la carga cognitiva de tener que inventar y estructurar simultáneamente. La solución evidente era \textbf{dividir la creación en pasos incrementales}, permitiendo que:
+
+\begin{itemize}
+    \item Cada etapa se enfoque en un aspecto específico del mundo
+    \item Los prompts puedan ser más explícitos sin exceder límites de longitud
+    \item Las salidas validadas de etapas anteriores sirvan como contexto para etapas posteriores
+    \item El LLM mantenga mejor coherencia al trabajar con tareas más acotadas
+    \item Se permita intervención y validación entre pasos
+\end{itemize}
+
+
+\subsubsection{Paso 1: El Núcleo de la Aventura}
+Esta etapa establece los fundamentos narrativos del mundo. El LLM recibe como entrada una idea del usuario (en modo \textit{Inspiration}) o genera una propuesta original (modo \textit{Generate}), produciendo:
+
+\begin{itemize}
+    \item \textbf{Título}: Nombre identificativo de la aventura
+    \item \textbf{Trasfondo} (\textit{backstory}): Contexto narrativo que motiva la acción
+    \item \textbf{Concepto del jugador}: Perfil del protagonista
+    \item \textbf{Objetivo principal}: Meta estructurada según \verb|ObjectiveType|
+\end{itemize}
+
+Esta etapa es análoga al experimento exitoso que realizamos con la descripción narrativa manual: se crea primero el ``porqué'' antes que el ``qué'' y el ``cómo''.
+
+El prompt de esta etapa difiere significativamente según el modo seleccionado, reflejando las diferentes necesidades de cada aproximación:
+
+\paragraph{Modo Generate - Responsabilidad Creativa Total}
+En este modo, el prompt enfatiza la autonomía completa del LLM. Le indicamos explícitamente que tiene libertad para inventar cualquier tipo de historia, ambientación (medieval, ciencia ficción, moderna, fantástica), personajes únicos con personalidades interesantes, y objetivos desafiantes. También le sugerimos categorías temáticas amplias como inspiración (misterio, aventura, supervivencia, social, exploración) que puede elegir o combinar libremente, pero sin imponer restricciones. El énfasis está en la creatividad sin límites y en la generación de conceptos originales.
+
+\paragraph{Modo Inspiration - Adherencia Temática Estricta}
+Durante las pruebas iniciales con el modo \textit{Inspiration}, observamos un problema recurrente: aunque mencionábamos el tema proporcionado por el usuario al inicio del prompt, el LLM tendía a generar mundos donde solo la ambientación general guardaba relación con la temática. Los NPCs, puzzles y especialmente el objetivo principal frecuentemente se desviaban hacia elementos genéricos sin conexión clara con el tema especificado. Por ejemplo, en un mundo con tema ``piratas del Caribe'', podríamos obtener una ambientación pirata pero con un objetivo de resolver un acertijo matemático abstracto, o NPCs con motivaciones completamente desvinculadas del contexto pirata.
+
+Para resolver este problema, diseñamos una estrategia de \textbf{reiteración temática constante} en el prompt. En lugar de mencionar el tema una sola vez, lo reforzamos en múltiples secciones del prompt, estableciendo que:
+
+\begin{itemize}
+    \item El tema proporcionado debe ser la base fundamental de TODO el concepto del mundo
+    \item Cada ubicación, personaje, objeto y especialmente el objetivo principal deben ser manifestaciones directas del tema
+    \item El LLM no debe inventar elementos desconectados del tema
+    \item Los personajes deben encarnar diferentes facetas del tema
+    \item El objetivo principal debe estar intrínsecamente relacionado con la temática
+    \item Los puzzles que se imaginen para etapas posteriores deben surgir naturalmente del tema
+\end{itemize}
+Esta reiteración constante resultó ser clave. Al enfatizar la obligación temática en cada sección relevante del prompt (no solo al principio), logramos que el LLM mantuviera la coherencia temática no únicamente en la ambientación superficial, sino en todos los elementos estructurales del mundo, especialmente en aquellos que afectan directamente la jugabilidad como el objetivo, los puzzles futuros y las motivaciones de los NPCs.
+
+%Aca hablar de la salida estructurada del paso 1, mencionar que se hablara mas a detalle en la seccion de Salida Estructurada
+
+\subsubsection{Paso 2: El Esqueleto del Mundo}
+
+Tomando como entrada el núcleo narrativo del Paso 1, esta etapa identifica las entidades principales necesarias para completar el objetivo. El LLM determina:
+\begin{itemize}
+    \item Ubicaciones clave en la ruta crítica
+    \item Personajes relevantes para la narrativa
+    \item Objetos necesarios para completar el objetivo
+    \item Relaciones preliminares entre entidades
+\end{itemize}
+En esta etapa se utilizan los \textbf{parámetros de configuración} especificados por el usuario (o valores por defecto), permitiendo controlar explícitamente el tamaño y complejidad del mundo:
+\begin{itemize}
+    \item \textbf{Número de ubicaciones}: Define la extensión espacial del mundo
+    \item \textbf{Cantidad de NPCs}: Determina cuántos personajes pueblan el mundo
+    \item \textbf{Cantidad de items}: Especifica el número de objetos interactuables
+    \item \textbf{Número de puzzles}: Establece cuántos desafíos incluir
+\end{itemize}
+Incorporamos estos parámetros al prompt del LLM de manera explícita, garantizando que el esqueleto generado respete las restricciones de tamaño. Por ejemplo, si el usuario especifica 5 ubicaciones y 2-4 (dos a cuatro) puzzles, el LLM debe generar exactamente esa cantidad de elementos en su propuesta, sea el número especifico o un número en el rango especificado.
+
+
+\paragraph{Conexión con el objetivo principal} Algo interesante a notar, es que durante las pruebas iniciales, observamos que el LLM tendía a generar entidades (ubicaciones, NPCs, objetos) que, aunque temáticamente coherentes, carecían de conexión funcional con el objetivo principal. Esto resultaba en mundos donde el jugador podía encontrarse con elementos interesantes pero irrelevantes para completar la aventura. Para mitigar este problema, establecimos reglas explícitas en el prompt de esta etapa:
+
+\begin{itemize}
+    \item \textbf{Conexiones claras con el objetivo}: Cada entidad generada debe tener una relación identificable con el camino hacia el objetivo. No basta con que sean temáticamente apropiadas; deben tener un propósito dentro de la progresión del juego.
+    \item \textbf{Ruta lógica hacia el objetivo}: Debe existir una secuencia clara de eventos, ubicaciones y acciones que permitan al jugador avanzar desde el punto de partida hasta la consecución del objetivo. Esta ruta no necesariamente debe ser lineal, pero sí debe ser identificable y coherente.
+\end{itemize}
+
+Sin embargo, como se detallará en el capítulo de evaluación (Capítulo 5), las pruebas posteriores revelaron que esto no fue completamente suficiente. En varios mundos generados seguimos encontrando puzzles, items o NPCs que no tenían un propósito real para alcanzar el objetivo. Esta característica puede interpretarse de dos maneras: como una limitación del sistema que genera contenido irrelevante, o como un elemento de ambientación con contenido exploratorio opcional y de ``accesorio''. La valoración de esta característica depende en última instancia de las expectativas y preferencias del jugador: algunos usuarios pueden apreciar la profundidad adicional y la sensación de un mundo más ``vivido'', mientras que otros pueden preferir experiencias más optimizadas donde cada elemento tenga un propósito claro en la resolución del objetivo.
+
+La \textbf{salida} de esta etapa es una lista de entidades sin detalles exhaustivos, funcionando como un \textit{esqueleto} que será completado en etapas posteriores, pero ya con las cantidades definidas que guiarán el resto del pipeline. Este esqueleto incluye nombres de ubicaciones, listado de NPCs, inventario de objetos, y cantidad de puzzles a crear, sin aún especificar descripciones detalladas, diálogos, o mecánicas específicas de los desafíos.
+
+\subsubsection{Paso 3: El Mundo Casi-Completo}
+Esta etapa materializa el esqueleto agregando detalles descriptivos y funcionales:
+
+\begin{itemize}
+    \item Descripciones textuales de ubicaciones
+    \item Atributos de personajes (diálogos, motivaciones)
+    \item Propiedades de objetos (portabilidad, usabilidad)
+    \item Conexiones entre ubicaciones
+\end{itemize}
+Con el esqueleto ya definido en el Paso 2, diseñamos el prompt de esta etapa para ser significativamente más específico sobre los requisitos de cada elemento, evitando las omisiones observadas en el enfoque one-shot.
+
+\paragraph{Asignación de ubicaciones y resolución de elementos flotantes} En esta etapa se asignan explícitamente ubicaciones a todos los objetos y personajes, resolviendo el problema de elementos ``flotantes'' que observamos en el enfoque one-shot. El prompt especifica que cada personaje debe estar ubicado en un lugar que existe en el mundo, y cada objeto debe tener una ubicación inicial definida o estar en el inventario de algún personaje.
+
+\paragraph{Restricciones de tamaño y conectividad} Como el tamaño del mundo se fija en el paso anterior, en esta etapa se le indica claramente al LLM que no debe agregar ubicaciones ni elementos nuevos que no formen parte del esqueleto existente (generado en el Paso 2). Esta medida surgió como respuesta a un patrón observado en las pruebas iniciales, donde el modelo tendía a ``expandirse creativamente'' y a incluir contenido fuera del alcance definido.
+
+Además de las especificaciones anteriores, establecimos reglas obligatorias de conexión entre ubicaciones:
+
+\begin{itemize}
+    \item \textbf{Bidireccionalidad}: Si la ubicación A conecta con B, entonces B debe conectar con A. Esta regla evita conexiones unidireccionales accidentales que podrían atrapar al jugador.
+    \item \textbf{Conectividad global}: Todas las ubicaciones deben ser accesibles desde cualquier punto del mundo. No puede haber ubicaciones aisladas o grupos de ubicaciones desconectadas del resto. Esto garantiza que el jugador siempre pueda explorar todo el mundo.
+    \item \textbf{Alcanzabilidad del objetivo}: El objetivo debe ser completable con los elementos creados, existiendo al menos una ruta lógica desde el estado inicial hasta la consecución del objetivo.
+\end{itemize}
+
+\paragraph{Validación de elementos funcionales} Diseñamos un conjunto de reglas destinadas a garantizar la consistencia funcional de los personajes y objetos del mundo. En el caso de los personajes, si poseen capacidad de interacción deben contar con texto de interacción definido, y todo objeto incluido en su inventario debe existir también en la lista global de objetos para evitar referencias inexistentes que comprometan la jugabilidad. En cuanto a los objetos, aquellos necesarios para cumplir el objetivo principal deben ser obtenibles por el jugador (\textit{gettable: true}), mientras que los objetos meramente decorativos pueden no serlo. Cada objeto debe tener una justificación clara dentro del mundo, ya sea funcional —como parte de un puzzle o requisito del objetivo— o atmosférica, contribuyendo a la ambientación general.
+
+\paragraph{Reglas para la definición de objetivos} Durante esta etapa establecimos reglas destinadas a garantizar la coherencia y la claridad en la definición de los objetivos del mundo. Cada tipo de objetivo presenta particularidades en su estructura y en la forma en que el jugador debe alcanzarlo, por lo que debimos incorporar criterios generales para mantener su foco y evitar confusión. En especial, limitamos el número de componentes principales de cada objetivo para asegurar que la meta final estuviera claramente delimitada y no se mezclara con los medios o herramientas necesarias para alcanzarla. Ademas de esto, agregamos elementos narrativos y de apoyo, como la descripción de completitud al finalizar el objetivo y un conjunto de ``ayudas'' progresivas que el jugador puede consultar durante la exploración.
+En particular, consideramos un tratamiento especial para los objetivos de tipo misterio, los cuales requieren una estructura narrativa más compleja y la introducción de pistas dentro del mundo. El desarrollo completo de los objetivos se abordará en la sección siguiente, dedicada al análisis detallado de las distintas clases, en particular los diferentes tipos de objetivo.
+
+Finalmente, incorporamos en el prompt una lista de verificación mental que el LLM debe ejecutar antes de finalizar la generación. Esta verificación incluye comprobar que todas las ubicaciones sean accesibles desde la ubicación inicial, que el jugador pueda completar el objetivo con los elementos disponibles y que exista al menos una ruta de solución posible desde el estado inicial. También se exige que todos los elementos referenciados existan efectivamente dentro del mundo, y en el caso de los objetivos de tipo misterio, que cada pista esté correctamente asociada a un objeto físico existente.
+
+El resultado es una estructura \verb|GeneratedWorld| funcional pero lineal, enfocada exclusivamente en la ruta principal hacia el objetivo. El mundo en este punto es jugable y completable, aunque aún carece de los puzzles y pasajes bloqueados que añadirán complejidad en la siguiente etapa. Las interacciones de personajes son directas y simples pero completas, proporcionando la base para una experiencia narrativa coherente.
+
+\textbf{Paso 4: Los Desafíos}
+
+Con el mundo base establecido, esta etapa introduce complejidad mediante:
+
+\begin{itemize}
+    \item Pasajes bloqueados: Conexiones entre ubicaciones que requieren condiciones específicas para desbloquearse
+    \item Puzzles: Desafíos clasificados según \verb|PuzzleType| que obstaculizan el progreso
+\end{itemize}
+El LLM analiza el mapa generado e identifica puntos estratégicos donde insertar estos obstáculos, asegurando que existan soluciones viables y coherentes con la narrativa.
+
+\paragraph{Enfoque de cadenas de dependencia} Inicialmente, diseñamos esta etapa con la ambición de crear \textbf{cadenas de dependencias complejas} (\textit{dependency chains}): secuencias lógicas de tareas interdependientes donde completar un paso desbloquea el siguiente. La visión era que, por ejemplo, para obtener el objetivo final, el jugador primero necesitaría la Llave A, que solo obtendría del Personaje B, quien la entregaría a cambio del Objeto C, que a su vez requeriría resolver el Puzzle D en la Ubicación E, y así sucesivamente.
+El concepto incluía:
+\begin{itemize}
+    \item Cadenas principales de 3-6 pasos interdependientes hacia el objetivo
+    \item Subcadenas para cada paso principal
+    \item Múltiples rutas opcionales cuando fuera posible
+    \item Diversidad de desafíos: intercambios, puzzles, exploración, interacciones sociales
+\end{itemize}
+
+% XX: creo que ambas XX se refieren a la misma Sección 3.2.2. Estructura de clases
+Sin embargo, durante las etapas tempranas de testing, esta estructura demostró ser problemática. El LLM fallaba consistentemente al generar estas cadenas, produciendo mundos con errores estructurales graves: dependencias circulares imposibles de resolver (A requiere B, B requiere C, C requiere A), referencias a objetos que no existían en los inventarios correctos, o simplemente generaciones sin sentido donde las relaciones de dependencia no tenían lógica coherente.
+Al analizar estos fallos, comprendimos que el problema radicaba en la \textbf{complejidad creciente del esquema del mundo}. Con cada característica que añadíamos (cadenas de dependencias, múltiples tipos de puzzles, diversos tipos de objetivos, validaciones cruzadas), el modelo de datos se volvía más intrincado y las restricciones más numerosas. El LLM simplemente no podía mantener toda esta información en contexto mientras generaba salidas estructuradas válidas. Esto nos obligó a tomar decisiones difíciles de diseño. Descartamos la implementación formal de estructuras de cadenas de dependencias; sin embargo, este no fue el único recorte. Como se detallará más adelante en las secciones XX y XX, también tuvimos que reducir la cantidad de tipos de objetivos y tipos de puzzles que inicialmente habíamos planificado. La complejidad del esquema era el cuello de botella fundamental del sistema, y solo mediante simplificación estratégica pudimos lograr generaciones consistentes y jugables.
+
+Aunque descartamos la implementación formal de cadenas de dependencias, decidimos mantener esa filosofía dentro del prompt. Explicar al LLM la generación de puzzles como un ``hilo conductor lógico'' donde cada desafío está motivado por el anterior resultó mucho más efectivo que simplemente pedirle ``añadir puzzles al mundo'': los resultados eran más coherentes, mejor integrados narrativamente y con una progresión más natural. En esta misma línea, el prompt enfatiza la conexión entre cada puzzle y un pasaje bloqueado o recurso esencial para avanzar, evitando así la aparición de desafíos ``flotantes'' sin consecuencias mecánicas claras. Para reforzar esta coherencia, se establecieron reglas específicas: todo pasaje bloqueado debe tener un obstáculo definido y un requisito concreto para desbloquearlo; los obstáculos y sus soluciones deben estar físicamente separados (por ejemplo, no colocar la llave junto a la puerta que abre); y las soluciones deben poder descubrirse a través de la exploración.
+
+\paragraph{Sistmea de pistas para puzzles} Durante las primeras pruebas observamos puzzles excesivamente complejos, donde el jugador podía quedar bloqueado sin una vía clara de avance. Para resolverlo, se implementó un \textbf{sistema obligatorio de pistas} asociado a cada puzzle, compuesto por entre tres y cinco pistas progresivas (\textit{puzzle\_hints}) que van desde una orientación general hasta una ayuda casi explícita. La efectividad de este sistema motivó la creación de \textbf{pistas para los objetivos} (explicadas ya en la sección XX), con el fin de mantener una coherencia en la asistencia ofrecida al jugador. Más adelante, surgió la idea de extender este enfoque a situaciones en las que el jugador se encontrara en una ubicación con un puzzle aún no iniciado. Así nació la \textbf{pista de interacción} (\textit{interaction\_hint}), una sugerencia breve que orienta al jugador sobre cómo comenzar la acción (por ejemplo, ``intenta hablar con [personaje]'', ``examina [objeto]'' o ``busca pistas en esta ubicación''). Este enfoque consolidó un sistema de ayuda más orgánico y adaptativo, que se integra con el mecanismo general descrito en la sección \ref{sec:logica_juego}.
+
+En esta etapa se mantuvieron las mismas \textbf{restricciones técnicas} definidas en el paso anterior, que limitan la capacidad del LLM para alterar la estructura del mundo: no se permite crear nuevas ubicaciones, deben preservarse las rutas de conectividad global entre ellas y se prohíben mecánicas de combinación o transformación de objetos, dado que el motor del juego no admite funciones de \textit{crafting}. Además, si un puzzle otorgado por un personaje incluye una recompensa física, el objeto correspondiente debe existir previamente y encontrarse en el inventario de dicho personaje. Sobre esta base, el LLM cuenta con cierta libertad para realizar una \textbf{redistribución estratégica} de los objetos del mundo, con el fin de ajustar la dificultad y el equilibrio narrativo. Esto implica poder mover elementos relevantes a ubicaciones menos accesibles o asignarlos a personajes que los entreguen mediante intercambio, siempre que la modificación mantenga coherencia lógica y motivación narrativa dentro del contexto del mundo.
+
+El resultado de esta etapa es un mundo con obstáculos estratégicamente distribuidos que transforman la experiencia de lineal a desafiante. Aunque no implementamos cadenas de dependencias formales, los puzzles generados mantienen coherencia narrativa y progresión lógica gracias a la filosofía de diseño preservada en el prompt.
+
+\subsubsection{Paso 5: Expansión del Mundo (Opcional)}
+
+La etapa final enriquece el mundo con contenido extra que incrementa la inmersión:
+\begin{itemize}
+    \item Ubicaciones secundarias no críticas
+    \item Personajes complementarios con narrativas propias
+    \item Objetos decorativos o de utilidad marginal
+    \item Rutas alternativas y exploración lateral
+\end{itemize}
+Esta expansión se realiza respetando la coherencia lógica y espacial del mundo establecido en las etapas anteriores.
+
+Este quinto paso es \textbf{opcional}. Durante la etapa de testing, comentamos este paso del pipeline para garantizar que los mundos generados cumplieran exactamente con los parámetros de tamaño especificados en la configuración inicial. La inclusión de este paso puede resultar en mundos que excedan las cantidades configuradas, lo cual puede ser deseable para aumentar la riqueza del contenido, pero puede no ser adecuado cuando se requiere control preciso sobre las dimensiones del mundo (por ejemplo, en evaluaciones comparativas o estudios de rendimiento). La decisión de incluir o excluir esta etapa debe tomarse en función de los objetivos específicos de cada caso de uso: mayor control y predictibilidad (sin expansión) versus mayor profundidad y contenido exploratorio (con expansión).
+
+
+\subsection{Estructura de clases}
+\subsubsection{World: Estructura Goal-Oriented}
+
+La clase \verb|World| constituye el contenedor principal de todos los elementos del juego y encapsula la filosofía de diseño fundamental del sistema: un mundo \textbf{story-driven, goal-oriented} donde cada elemento está conectado lógica y semánticamente al objetivo principal y la narrativa.
+
+Durante las etapas tempranas del desarrollo, nos enfrentamos a un problema crítico en la generación de mundos. Los primeros intentos produjeron mundos donde los elementos estaban ``sueltos'': puzzles que no contribuían a ningún progreso, ubicaciones que no servían para nada, personajes sin propósito narrativo. Esta desconexión hacía extremadamente difícil probar el sistema y resultaba en experiencias de juego frustrantes e incoherentes.
+
+Este problema motivó una pausa estratégica en el desarrollo para replantear fundamentalmente la arquitectura del mundo. La idea central que surgió fue: \textbf{todo debe estar lógica y semánticamente conectado en torno al objetivo y la historia}. No queríamos mundos que fueran simplemente colecciones de elementos temáticamente coherentes; queríamos mundos donde cada elemento tuviera un propósito funcional claro en la progresión hacia el objetivo.
+
+Para implementar esta visión, diseñamos la estructura \verb|GeneratedWorld| con \textbf{conexiones y referencias explícitas} entre todos sus componentes. Esto implicó cambios significativos en la clase \verb|World| heredada: antes, las relaciones entre elementos eran implícitas, por ejemplo, una ubicación podía listar ítems por nombre, pero no había validación estructural de que realmente existieran en el mundo. Las condiciones para avanzar estaban codificadas en la lógica del motor del juego, no en la definición del mundo mismo.
+
+
+La nueva arquitectura modela explícitamente:
+\begin{itemize}
+    \item \textbf{Personajes con propósito}: Cada NPC relacionado con la historia tiene algo útil para el jugador (información, objetos) y establece condiciones claras para obtenerlo (resolver un puzzle, entregar un ítem, completar una tarea).
+    \item \textbf{Puzzles con consecuencias}: Los puzzles no ``están por ahí'' sin más; su resolución produce efectos tangibles modelados directamente en su definición: entregar ítems específicos, desbloquear pasajes concretos, revelar información necesaria para el objetivo.
+    \item \textbf{Ítems funcionales}: Los objetos del mundo tienen roles definidos en la progresión narrativa, ya sea como requisitos para puzzles, moneda de intercambio con personajes, o componentes directos del objetivo o temática.
+    \item \textbf{Ubicaciones con significado}: Las ubicaciones no son simplemente escenarios decorativos; contienen elementos críticos para el avance o sirven como puntos de conexión en la red de dependencias del mundo.
+\end{itemize}
+
+Este diseño goal-oriented ofrece ventajas cruciales tanto para el LLM como para el sistema:
+\begin{itemize}
+    \item \textbf{Guía para la generación}: Al tener que generar mundos de cero, el LLM ahora recibe una estructura clara que define qué elementos debe crear y cómo deben relacionarse. Las conexiones explícitas reducen la ambigüedad y orientan la creatividad del modelo hacia resultados funcionales.
+    \item \textbf{Validación automática}: Las referencias cruzadas (por ejemplo, ``este personaje da un ítem que debe existir'') son coherentes y pueden validarse estructuralmente. Si un puzzle referencia un objeto como recompensa, ese objeto debe existir en el inventario del personaje o ubicación correspondiente.
+    \item \textbf{Jugabilidad garantizada}: Al forzar conexiones explícitas con el objetivo, minimizamos la generación de contenido irrelevante o decorativo puro. De esta manera, la mayoría de los elementos tendrán, en principio, un propósito en la experiencia del jugador.
+\end{itemize}
+
+La validación y coherencia son desafiantes incluso con esta estructura de código explícita; sin ella, con definiciones implícitas, sería prácticamente imposible que el LLM generara mundos funcionales. El enfoque goal-oriented no es meramente una decisión de diseño; constituye una necesidad técnica fundamental para hacer viable la generación automática de mundos jugables y coherentes.
+
+La clase \verb|World| encapsula los siguientes elementos estructurales:
+\begin{itemize}
+    \item \textbf{Metadatos narrativos}: Título, backstory, concepto del jugador
+    \item \textbf{Objetivo principal}: Instancia de \verb|Objective| que define la meta del mundo
+    \item \textbf{Ubicaciones}: Lista de \verb|Location| con sus conexiones bidireccionales
+    \item \textbf{Personajes}: Lista de \verb|Character| con sus inventarios y condiciones de interacción
+    \item \textbf{Ítems}: Catálogo global de \verb|Item| con sus propiedades y ubicaciones
+    \item \textbf{Puzzles}: Conjunto de \verb|Puzzle| con sus recompensas y requisitos
+    \item \textbf{Estado inicial}: Ubicación de inicio y configuración inicial del jugador
+\end{itemize}
+
+La Figura \ref{fig:world-class-diagram} muestra la estructura de clases completa y las relaciones entre World y sus componentes.
+
+Esta estructura garantiza que todos los elementos del mundo estén explícitamente definidos y conectados, permitiendo tanto al LLM generarlos coherentemente como al motor del juego validarlos y ejecutarlos correctamente.
+
+
+   \begin{figure}[h]
+       \centering
+       \includegraphics[width=0.9\textwidth]{figs/diagramaWorld.png}
+       \caption{Diagrama de clases: World y sus componentes}
+       \label{fig:world-class-diagram}
+   \end{figure}
+
+
+\subsubsection{Location: Conectividad y Accesibilidad}
+
+La clase \verb|Location| representa los espacios físicos del mundo donde transcurre la acción. Cada ubicación hereda de \verb|Component| los atributos básicos de nombre y descripciones, y añade funcionalidad específica para la navegación espacial. En términos de atributos y componentes, esta clase se mantuvo prácticamente igual a la implementación original de Payador; nuestra contribución principal se centró en las validaciones de conectividad que garantizan la generación de mundos jugables.
+
+\paragraph{Atributos principales}
+\begin{itemize}
+    \item \textbf{items}: Lista de objetos presentes en la ubicación
+    \item \textbf{connecting\_locations}: Lista de ubicaciones directamente accesibles
+    \item \textbf{blocked\_locations}: Diccionario de pasajes bloqueados por obstáculos (ítems o puzzles)
+    \item \textbf{visited}: Indicador de si el jugador ha visitado previamente la ubicación. Este atributo se envía al LLM como parte del contexto del mundo, permitiendo que adapte la narrativa: ubicaciones visitadas por primera vez reciben descripciones más elaboradas y detalladas, mientras que ubicaciones ya conocidas generan narraciones más breves y enfocadas en cambios relevantes.
+
+\end{itemize}
+
+\paragraph{Validaciones de conectividad}
+Para garantizar la jugabilidad del mundo generado, implementamos validaciones estrictas sobre la topología de ubicaciones durante el Paso 3 del pipeline. Estas validaciones son críticas porque previenen la generación de mundos imposibles de completar:
+
+\begin{itemize}
+    \item \textbf{Bidireccionalidad}: Si la ubicación A conecta con B, entonces B debe conectar con A. Esta regla evita conexiones unidireccionales accidentales que podrían atrapar al jugador.
+    \item \textbf{Conectividad global}: Todas las ubicaciones deben ser accesibles desde cualquier punto del mundo. No puede haber ubicaciones aisladas o grupos de ubicaciones desconectadas del resto.
+    \item \textbf{Alcanzabilidad del objetivo}: El objetivo debe ser completable considerando la topología del mundo y los elementos disponibles. Debe existir al menos una ruta válida desde el estado inicial hasta la consecución del objetivo.
+\end{itemize}
+
+Estas reglas se especifican explícitamente en el prompt del Paso 3, guiando al LLM a generar estructuras espaciales coherentes y navegables. Sin embargo, dado que el LLM puede fallar en mantener estas restricciones, implementamos una \textbf{verificación automática post-generación} que valida la conectividad mediante búsqueda en profundidad (DFS). Esta función construye un grafo de adyacencia considerando tanto conexiones normales como pasajes bloqueados (que siguen siendo conexiones topológicas, solo temporalmente inaccesibles), y verifica que todas las ubicaciones sean alcanzables desde cualquier punto de partida. Si la validación falla, el sistema reporta qué ubicaciones quedaron aisladas, permitiendo detectar y corregir mundos con topologías inválidas antes de que lleguen al jugador. La validación de estas propiedades era impráctica en el enfoque one-shot, donde el LLM tendía a olvidar estas restricciones al generar simultáneamente todos los aspectos del mundo.
+
+\subsubsection{Item: Funcionalidad y Portabilidad}
+
+La clase \verb|Item| representa los objetos interactuables del mundo. Al igual que Location, hereda de \verb|Component| los atributos de nombre y descripciones. Esta clase se mantuvo idéntica a la implementación de Payador en términos de estructura: los atributos de nombre, descripciones y \verb|gettable| no sufrieron modificaciones. Nuestra contribución se centró en las validaciones que garantizan el uso coherente de estos atributos durante la generación automática.
+
+El único atributo específico de Item es \verb|gettable| (booleano), que determina si el objeto puede ser tomado por el jugador y añadido a su inventario. Esta propiedad simple tiene implicaciones profundas para el diseño del mundo y el contexto narrativo (debería ser imposible para un humano cargar con un tanque de agua, por ejemplo):
+
+\paragraph{Validaciones durante la generación}
+En el Paso 3 del pipeline, establecimos reglas explícitas sobre el uso de \verb|gettable|:
+\begin{itemize}
+    \item Todo objeto necesario para completar el objetivo principal debe ser \verb|gettable=True|, garantizando que el jugador pueda obtenerlo.
+    \item Los objetos que bloquean pasajes pueden ser \verb|gettable=True| (se desbloquea al tomarlos) o \verb|gettable=False| (requieren otra solución, como un puzzle).
+    \item Cada objeto debe tener una justificación clara dentro del mundo: funcional (parte de la progresión) o atmosférica (ambientación).
+\end{itemize}
+
+Esta distinción permite al LLM crear mundos donde no todos los objetos mencionados en las descripciones necesitan ser manipulables, evitando inconsistencias donde elementos puramente narrativos pudieran confundirse con items funcionales del gameplay.
+
+\paragraph{Desafío técnico: Referencias únicas vs. duplicación}
+Durante el desarrollo enfrentamos un problema crítico relacionado con el manejo de referencias de objetos. Cuando el jugador intentaba tomar un ítem, particularmente aquellos otorgados como recompensa de puzzles, el sistema duplicaba el objeto en lugar de mover la referencia existente. La causa raíz era que el LLM frecuentemente no creaba los ítems de recompensa especificados en los puzzles, y nuestra solución inicial fue crear el ítem automáticamente si no existía. Sin embargo, esto causaba duplicación cuando el ítem sí existía pero la lógica de búsqueda fallaba en encontrarlo en las ubicaciones esperadas (inventarios de personajes o ítems en ubicaciones).
+
+La solución definitiva fue dual:
+\begin{itemize}
+    \item \textbf{Prevención en generación}: Implementamos una validación exhaustiva de recompensas de puzzles (detallada en la subsección de Puzzle) que verifica y crea los ítems faltantes durante la generación del mundo, no durante el gameplay.
+    \item \textbf{Corrección en transferencia}: Refactorizamos la lógica de transferencia de ítems para buscar la referencia exacta del objeto en todos los contenedores posibles (inventarios de personajes, ítems en ubicaciones, y obstáculos bloqueando pasajes), moviendo la referencia en lugar de crear copias, y reportando errores explícitos si el objeto no se encuentra en ningún contenedor.
+\end{itemize}
+
+Este bug evidenció la importancia de mantener referencias únicas a los objetos del mundo y validar exhaustivamente su ubicación antes de cualquier operación de transferencia. La complejidad surge porque los ítems pueden existir en múltiples contextos: como elementos libres en ubicaciones, en inventarios de personajes, o actuando como obstáculos que bloquean pasajes. 
+
+Sin embargo, como se discutirá en detalle en el Capítulo 4 (\ref{sec:interaccion_llm_jugador}) de evaluación, este problema reaparece en casos límite específicos: cuando el LLM intenta mover un objeto al inventario del jugador pero la búsqueda de su ubicación actual falla (debido a problemas de comparación de identidad de objetos), el sistema interpreta incorrectamente la operación como un ``drop item'', añadiendo el objeto a la ubicación actual sin removerlo de su posición original, resultando en duplicación. Este comportamiento revela la fragilidad de la lógica de control de flujo cuando se combina con la búsqueda flexible de objetos y las múltiples ramificaciones condicionales del sistema de actualización del mundo.
+
+\subsubsection{Character: Agentes en el Mundo}
+
+La clase \verb|Character| representa tanto al jugador como a los personajes no jugadores (NPCs) del mundo. Al igual que las clases anteriores, hereda de \verb|Component| y se mantuvo estructuralmente similar a la implementación de Payador, con ajustes menores para soportar las necesidades del sistema de generación.
+
+\paragraph{Atributos principales}
+\begin{itemize}
+    \item \textbf{inventory}: Lista de ítems que posee el personaje
+    \item \textbf{location}: Referencia a la ubicación actual donde se encuentra
+    \item \textbf{visited\_locations}: Diccionario que registra las ubicaciones visitadas y sus descripciones sucesivas
+    \item \textbf{interaction}: Datos estructurados de interacción provenientes del proceso de generación, que incluyen información sobre puzzles propuestos y condiciones de intercambio
+\end{itemize}
+
+\paragraph{Validaciones para NPCs generados}
+Durante el Paso 3 del pipeline, establecimos reglas para garantizar que los NPCs generados sean funcionalmente coherentes:
+\begin{itemize}
+    \item Si un personaje tiene capacidad de interacción, debe contar con texto de interacción definido.
+    \item Todo objeto en el inventario de un personaje debe existir en la lista global de objetos del mundo, evitando referencias inexistentes.
+    \item Los personajes deben estar asignados a una ubicación válida del mundo, resolviendo el problema de NPCs ``flotantes'' observado en el enfoque one-shot.
+\end{itemize}
+
+Estas validaciones aseguran que los NPCs no solo sean temáticamente apropiados sino también funcionalmente integrados en la mecánica del juego, permitiendo intercambios de ítems, proposición de puzzles, y progresión narrativa coherente.
+
+\subsubsection{Puzzle: Desafíos y Progresión} \label{subsec:puzzles}
+
+La clase \verb|Puzzle| representa los desafíos que obstaculizan el progreso del jugador hacia el objetivo. A diferencia de las clases anteriores, Puzzle experimentó modificaciones y extensiones significativas respecto a la implementación base de Payador, impulsadas por los problemas observados durante el testing y las necesidades del sistema de generación automática.
+
+\paragraph{Atributos estructurales}
+\begin{itemize}
+    \item \textbf{problem}: El enunciado del desafío que debe resolver el jugador
+    \item \textbf{answer}: La respuesta esperada (oculta al jugador)
+    \item \textbf{puzzle\_type}: Categorización del tipo de puzzle (riddle, logic, sequence, etc.)
+    \item \textbf{proposed\_by\_character}: Nombre del personaje que propone el puzzle, o None si es ambiental
+    \item \textbf{proposed\_by\_location}: Nombre de la ubicación cuya investigación propone el puzzle (ambientales), None si es propuesto por un personaje
+    \item \textbf{rewards}: Recompensa dada al resolver el puzzle (ítems, pasajes desbloqueados)
+    \item \textbf{relevance\_to\_objective}: Explicación de cómo resolver este puzzle contribuye al objetivo principal
+    \item \textbf{puzzle\_hints}: Lista de pistas progresivas para ayudar al jugador
+    \item \textbf{interaction\_hint}: Sugerencia breve sobre cómo iniciar la interacción con el puzzle
+\end{itemize}
+
+\paragraph{Tipología de puzzles}
+Uno de los primeros cambios implementados fue la introducción de tipos explícitos de puzzles. Sin esta categorización, el LLM quedaba ``a la deriva'' al momento de crear desafíos, generando puzzles inconsistentes o mal estructurados. Los tipos permitidos son:
+
+\begin{itemize}
+    \item \textbf{Riddle}: Adivinanzas que requieren razonamiento lateral o conocimiento general
+    \item \textbf{Logic}: Problemas lógicos que requieren deducción o razonamiento estructurado
+    \item \textbf{Wordplay}: Juegos de palabras, anagramas, o puzzles lingüísticos
+    \item \textbf{Observation}: Observar detalles del entorno para encontrar la solución
+    \item \textbf{Sequence}: Ordenar elementos o realizar acciones en una secuencia específica
+    \item \textbf{Code}: Descifrar códigos o patrones
+    \item \textbf{Memory}: Recordar información presentada previamente en la narrativa
+\end{itemize}
+
+Inicialmente habíamos incluido un tipo \textit{Information} donde resolver el puzzle otorgaba información relevante para el objetivo. Sin embargo, este tipo fue descartado porque los puzzles de este tipo frecuentemente no se presentaban correctamente o, cuando se resolvían, entregaban información irrelevante u obvia, dejando al jugador con la sensación de haber perdido el tiempo. La recompensa tangible (ítems, pasajes desbloqueados o directamente cumplir el objetivo) resultó más satisfactoria y funcionalmente clara que las recompensas informacionales.
+
+\paragraph{Problema 1: Puzzles invisibles}
+Uno de los problemas más persistentes fue que el LLM creaba puzzles que nunca eran presentados al jugador durante la partida. Inicialmente intentamos resolver esto mediante prompting, agregando \verb|interaction_hints| y especificando si el puzzle era \verb|proposed_by_character| o \verb|proposed_by_location| para que el LLM supiera cuándo narrarlo. Sin embargo, el LLM frecuentemente ``se olvidaba'': aunque el jugador hablara con el personaje que tenía un puzzle, el LLM muchas veces no lo narraba. Dado esto, decidimos que no podíamos confiar en el LLM para esta tarea crítica. La solución a la que llegamos fue \textbf{una intervención directa del sistema}: si el input del usuario menciona a un personaje que propone un puzzle, no solicitamos narración al LLM; en su lugar, el sistema narra directamente la proposición del puzzle utilizando el \verb|interaction_text| previamente generado. Esta intervención garantiza que un gran porcentaje de puzzles sean efectivamente presentados al usuario. Luego de ser presentado se le da un atributo de \verb|given: True| al puzzle, asi si vuelve a interactuar con el personaje, no se lo vuelve a presentar.
+
+\paragraph{Problema 2: Puzzles falsos (alucinación)}
+Otro problema recurrente fue que el LLM alucinaba puzzles inexistentes. Si el jugador hablaba con un NPC y le pedía algo que este tenía, había ocasiones en que el LLM narraba algo como ``resuelve este puzzle y te lo daré'' aunque el NPC no tuviera ningún puzzle asociado. Este problema era particularmente insidioso porque no era evidente durante el juego; solo al inspeccionar los archivos JSON del mundo podíamos detectar que el jugador estaba intentando resolver un puzzle que no existía en la estructura del mundo.
+
+La solución requirió ser más explícitos en el prompt de narración, especificando que si no hay un puzzle presente en la estructura del mundo, el LLM no debe inventar puzzles. Las validaciones estructurales del JSON del mundo fueron fundamentales para detectar este tipo de inconsistencias.
+
+\paragraph{Problema 3: Puzzles excesivamente difíciles}
+Durante el testing observamos puzzles tan creativos y difíciles que resultaban imposibles de resolver sin ayuda externa. En múltiples ocasiones tuvimos que ``hacer trampa'' consultando directamente la respuesta en el JSON del mundo, ya que podíamos pasar muchos minutos intentando razonar el puzzle sin siquiera acercarnos a la solución.
+
+Este problema motivó la implementación del \textbf{sistema de pistas progresivas} (\verb|puzzle_hints|). Las pistas están ordenadas en cantidad ascendente de información: la primera puede orientar al jugador, pero la tercera prácticamente revela la respuesta, reconociendo que el jugador está atascado. Como se discutió en la sección del pipeline, esta idea resultó tan efectiva que la expandimos a pistas para objetivos y pistas de exploración general. Las evaluaciones con usuarios confirmaron la utilidad de este sistema: muchos solicitaron las tres pistas para los puzzles, indicando que se habrían atascado de no existir.
+
+\paragraph{Problema 4: NPCs codiciosos}
+Cuando un puzzle era propuesto por un NPC y su recompensa era un ítem en el inventario del personaje, observamos que el NPC no entregaba el objeto tras resolver el puzzle correctamente. El problema radicaba en que el LLM no sugería el cambio necesario de \verb|moved_object| del inventario del NPC al jugador.
+
+La solución nuevamente requirió intervención del sistema: cuando el usuario resuelve un puzzle, se llama a una función que verifica las recompensas, busca el ítem correspondiente y lo mueve automáticamente al inventario del usuario, sin depender de que el LLM genere esta acción en su narración.
+
+\paragraph{Problema 5: Recompensas inexistentes}
+En varios mundos generados, las recompensas de puzzles (especificadas como \verb|ItemReward|) no existían en el esqueleto del mundo. Cuando el usuario resolvía el puzzle, no ocurría nada porque no había ítem que mover. Este problema se detectó durante validaciones post-generación y se resolvió mediante una función de verificación que:
+
+\begin{itemize}
+    \item Verifica que todos los ítems de recompensa existan en \verb|world.items|
+    \item Si un ítem de recompensa no existe, lo crea automáticamente
+    \item Asigna el ítem creado al inventario del personaje que propone el puzzle, o a la ubicación del puzzle si es ambiental
+    \item Registra todas las correcciones aplicadas para debugging
+\end{itemize}
+
+\paragraph{Problema 6: Validación de respuestas}
+La verificación de respuestas correctas presentó múltiples desafíos. Inicialmente, diferencias menores como puntuación o mayúsculas causaban que respuestas correctas fueran rechazadas (e.g., ``a map'' vs ``A map.''). Implementamos normalización de respuestas que:
+
+\begin{itemize}
+    \item Convierte todo a minúsculas
+    \item Elimina puntuación al inicio y final
+    \item Normaliza espacios en blanco
+    \item Remueve artículos iniciales (a, an, the)
+\end{itemize}
+
+Sin embargo, persisten limitaciones con sinónimos y respuestas semánticamente equivalentes. Por ejemplo, en la etapa de evaluación nos topamos con el acertijo ``What walks on four legs in the morning, two in the afternoon, and three in the evening?'', la respuesta esperada era ``man'' pero un evaluador respondió ``humans'' dos veces diferentes, siendo marcado como incorrecto en ambas ocasiones. El evaluador se frustró y abandonó el puzzle sin resolverlo. Este problema evidencia las limitaciones de la validación basada en comparación de strings normalizada: aunque empleamos el LLM para determinar la correctitud de la respuesta de puzzles, el prompt prioriza coincidencia exacta con la respuesta esperada. Podríamos ajustar el prompt para que acepte sinónimos más liberalmente, pero esto introduciría riesgos significativos de falsos positivos donde respuestas incorrectas sean aceptadas por similitud superficial.
+
+\subsubsection{Objective: Meta y Cierre Narrativo}
+
+La clase \verb|Objective| experimentó cambios sustanciales respecto a la implementación de Payador, evolucionando desde un sistema simple de tuplas a una estructura compleja con múltiples tipos, validaciones exhaustivas y elementos narrativos. Esta clase define la meta que el jugador debe alcanzar y proporciona el cierre narrativo de la aventura.
+
+\paragraph{Estructura del objetivo}
+Un objetivo estructurado (\verb|GeneratedObjective|) contiene:
+\begin{itemize}
+    \item \textbf{type}: Tipo de objetivo (reach\_location, get\_item, deliver\_an\_item, find\_character, solve\_mystery)
+    \item \textbf{components}: Lista de componentes involucrados (ítems, personajes, ubicaciones). Todos los componentes referenciados deben existir en el mundo
+    \item \textbf{description}: Descripción clara de lo que el jugador debe lograr
+    \item \textbf{success\_conditions}: Condiciones específicas que deben cumplirse para completar el objetivo
+    \item \textbf{completion\_narration}: Descripción narrativa de lo que sucede tras completar el objetivo (no usado en solve\_mystery)
+    \item \textbf{objective\_hints}: Pistas progresivas para avanzar hacia el objetivo (3 pistas para dar en orden de más general a más específica)
+    \item \textbf{mystery\_clues}: Lista de pistas para objetivos de misterio (solo tipo solve\_mystery)
+    \item \textbf{mystery\_solution}: Solución del misterio (solo tipo solve\_mystery)
+\end{itemize}
+
+\paragraph{Tipología de objetivos}
+Se definieron cinco tipos de objetivos, algunos inspirados en los mundos existentes en Payador y otros completamente nuevos:
+
+\begin{itemize}
+    \item \textbf{REACH\_LOCATION}: El jugador debe llegar a una ubicación específica
+    \item \textbf{GET\_ITEM}: El jugador debe obtener uno o más objetos específicos
+    \item \textbf{DELIVER\_AN\_ITEM}: El jugador debe entregar un objeto a un personaje o ubicación
+    \item \textbf{FIND\_CHARACTER}: El jugador debe encontrar a un personaje específico
+    \item \textbf{SOLVE\_MYSTERY}: El jugador debe descubrir todas las pistas asociadas a un misterio
+\end{itemize}
+
+\paragraph{Problema fundamental: Objetivos imposibles}
+El primer problema crítico que enfrentamos fue que el LLM generaba objetivos imposibles de completar: pedía conseguir objetos que no había creado, llegar a lugares inexistentes, o encontrar personajes no ubicados en el mundo. Este fue uno de los primeros problemas que motivó la implementación de validaciones exhaustivas.
+
+Desarrollamos una función de verificación (\verb|verify_objective_completability|) que valida para cada tipo de objetivo:
+\begin{itemize}
+    \item \textbf{REACH\_LOCATION}: La ubicación objetivo existe y es alcanzable desde la ubicación inicial
+    \item \textbf{GET\_ITEM}: El ítem objetivo existe, está ubicado en algún lugar accesible (ubicación o inventario de personaje), y tiene \verb|gettable=True|
+    \item \textbf{DELIVER\_AN\_ITEM}: Tanto el ítem como el destino (ubicación o personaje) existen y son accesibles
+    \item \textbf{FIND\_CHARACTER}: El personaje objetivo existe y está ubicado en una localización válida
+    \item \textbf{SOLVE\_MYSTERY}: Todas las pistas del misterio están asociadas con ítems que existen en el mundo
+\end{itemize}
+
+\paragraph{Problema: Objetivos compuestos y mecánicas no soportadas}
+En las primeras generaciones, el LLM frecuentemente creaba objetivos compuestos del estilo ``encuentra las 3 reliquias y únelas para armar la llave'' o ``consigue los 4 cristales elementales para activar el portal''. Estos objetivos presentaban dos problemas fundamentales:
+
+\begin{itemize}
+    \item El código no estaba preparado para manejar objetivos de múltiples elementos como una sola unidad cohesiva
+    \item Las mecánicas de ``fusión'' o ``combinación'' de objetos no existían en el motor del juego (no hay sistema de \textit{crafting})
+\end{itemize}
+
+Consideramos implementar un tipo \verb|get_items| que se completara progresivamente (e.g., 33\% al obtener el primer ítem, 66\% al obtener el segundo, 100\% al obtener el tercero). Sin embargo, esto generó múltiples problemas y confusiones tanto en la implementación como en la experiencia del jugador. La solución más simple y robusta fue establecer reglas explícitas en el prompt que limitaran la complejidad de los objetivos:
+
+\begin{itemize}
+    \item \verb|GET_ITEM|: SOLO UN ítem objetivo (no colecciones múltiples)
+    \item \verb|REACH_LOCATION|: SOLO UNA ubicación de destino
+    \item \verb|FIND_CHARACTER|: SOLO UN personaje objetivo
+    \item \verb|DELIVER_AN_ITEM|: UN ítem y UN destino
+\end{itemize}
+
+Esta restricción simplificó dramáticamente la verificación de completitud del objetivo y eliminó la ambigüedad sobre qué elementos eran requeridos versus opcionales.
+
+\paragraph{Problema de narración: Objetivos mal comunicados}
+Otro problema recurrente ocurría al narrar el objetivo al inicio de la aventura. En lugar de describir el objetivo, el LLM a veces respondía meta-comentarios como ``Perfecto! Narraré el objetivo entre símbolos'', lo cual claramente no era útil para el jugador. Intentamos mitigar esto con instrucciones más explícitas en el prompt y usando marcadores especiales (\verb|#objetivo#|) para extraer solo la parte relevante, pero el problema persistía ocasionalmente.
+
+La solución definitiva fue dual: (1) mantener los intentos de corrección en el prompt para mejorar la narración inicial, y (2) crear un \textbf{quick action} que muestra el objetivo directamente desde la estructura del mundo (\verb|objective.description|), sin depender del LLM para su narración. Esta segunda solución no solo resuelve el bug de meta-comentarios sino que también permite a los usuarios consultar el objetivo en cualquier momento sin tener que hacer scroll hasta la narración inicial, mejorando significativamente la experiencia de usuario.
+
+
+\paragraph{Cierre narrativo: Completion Narration}
+La implementación del objetivo tipo \verb|solve_mystery| (que se discutirá a continuación) incluyó una narración de cierre al completar el objetivo (\verb|mystery_solution|). Esta característica resultó tan satisfactoria que decidimos extenderla a todos los tipos de objetivos mediante \verb|completion_narration|, que proporciona un desenlace narrativo al completar la aventura.
+
+Sin embargo, en las evaluaciones con usuarios observamos que la narración de cierre ocasionalmente causaba confusión. Un evaluador completó un objetivo de tipo \verb|solve_mystery| con una sola pista, recibió la narración de cierre, pero interpretó que el juego continuaba y siguió jugando durante una hora adicional. Aunque el evaluador reportó haberse divertido, esto evidenció la necesidad de comunicar más explícitamente que el juego ha terminado, particularmente cuando los objetivos se completan más rápidamente de lo esperado.
+
+\paragraph{Objetivos de Misterio: Diseño y Desafíos} \label{subsec:objetivos_misterio}
+El tipo de objetivo \verb|solve_mystery| requirió el diseño más complejo y recibió mayor atención durante el desarrollo. A diferencia de los demás tipos de objetivos que se verifican mediante condiciones directas (posesión de un ítem, presencia en una ubicación), los objetivos de misterio se completan cuando el jugador descubre todas las pistas asociadas.
+
+La mecánica funciona de la siguiente manera:
+\begin{itemize}
+    \item Cada pista (\verb|MysteryClue|) está asociada con un ítem físico del mundo
+    \item Cuando el jugador interactúa con un ítem que tiene una pista asociada, el sistema (no el LLM) detecta la interacción y marca la pista como descubierta
+    \item Se muestra al jugador un mensaje especial con el nombre de la pista, su descripción, su relevancia al misterio, y el progreso actual (X/N pistas descubiertas)
+    \item Al descubrir todas las pistas, el objetivo se completa y se revela el \verb|mystery_solution|
+\end{itemize}
+
+Las reglas especiales en el prompt para objetivos de misterio incluyen:
+\begin{itemize}
+    \item Cada pista debe estar asociada ÚNICAMENTE con un objeto/ítem físico que existe en el mundo, NUNCA con personajes o ubicaciones
+    \item El \verb|associated_item| debe ser exactamente el nombre de un objeto que aparece en la lista de ítems del mundo
+    \item El objetivo debe incluir \verb|mystery_clues| (lista detallada de pistas) y \verb|mystery_solution| (solución completa del misterio)
+    \item NO se usa \verb|completion_narration| para este tipo; en su lugar se usa \verb|mystery_solution|
+\end{itemize}
+
+\paragraph{Validación de pistas: Creación vs. Eliminación}
+Similar al problema de recompensas inexistentes en puzzles, enfrentamos situaciones donde las pistas de misterio referenciaban ítems que no existían en el mundo. Sin embargo, adoptamos una estrategia opuesta a la usada con puzzles: en lugar de crear los ítems faltantes, eliminamos las pistas inválidas. Esta decisión se tomó porque crear ítems automáticamente para pistas podía resultar en objetos desconectados de la narrativa, mientras que eliminar pistas simplemente reducía el número de pistas a descubrir, manteniendo la coherencia del mundo.
+
+Esta diferencia en el enfoque de validación (crear elementos faltantes para puzzles, eliminar elementos inválidos para pistas) refleja las diferentes prioridades: los puzzles son obstáculos activos que bloquean progresión y deben funcionar correctamente, mientras que las pistas son elementos opcionales de descubrimiento que pueden ajustarse en cantidad sin comprometer la jugabilidad fundamental.
+
+Sin embargo, esta estrategia de eliminación ocasionalmente resultó en objetivos de misterio con muy pocas pistas (incluso una sola), lo cual contribuyó al problema mencionado anteriormente donde un evaluador completó el objetivo más rápidamente de lo anticipado. En retrospectiva, quizás hubiera sido preferible seguir la misma lógica que los puzzles: crear los ítems faltantes y ubicarlos coherentemente en el mundo.
+
+\subsection{World Builder y Validación de Consistencia}
+
+El \textit{World Builder} actúa como el eje central del proceso de generación, coordinando la ejecución secuencial de los cinco pasos y aplicando validaciones a los resultados de cada etapa. Esta arquitectura de validación por etapas resultó fundamental para detectar y corregir inconsistencias que el LLM introduce durante la generación, garantizando que los mundos finales sean estructuralmente válidos y jugables.
+
+\paragraph{Orquestación y sistema de reintentos}
+La función \verb|create_world_incrementally()| ejecuta el pipeline completo, manteniendo una única instancia del modelo de lenguaje y solicitando estructuras Pydantic en cada paso. Implementamos un sistema de reintentos con máximo 3 intentos por paso, ejecutando validaciones específicas según la etapa:
+
+\begin{itemize}
+    \item \textbf{Paso 2}: Esquema Pydantic + verificación de tamaños configurados
+    \item \textbf{Paso 3}: Esquema Pydantic + conectividad de ubicaciones (DFS) + completabilidad del objetivo
+    \item \textbf{Paso 4}: Esquema Pydantic + recompensas de puzzles + re-validación de conectividad y completabilidad
+\end{itemize}
+
+Si cualquier validación falla, se descarta la generación y se reintenta el paso. Tras 3 intentos fallidos, el pipeline completo falla con excepción descriptiva.
+
+\paragraph{Diferencia crítica: Corrección vs. Rechazo}
+Las recompensas faltantes en puzzles se \textbf{corrigen automáticamente} dentro del intento actual, permitiendo salvar mundos con olvidos menores. Los objetivos imposibles \textbf{causan rechazo y reintento completo} del paso. Esta asimetría refleja criticidad relativa: puzzles son problemas localizados corregibles; objetivos imposibles invalidan la jugabilidad completa.
+
+Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el LLM es consistentemente inconsistente (generando repetidamente objetivos con ítems que no incluye en la lista de elementos del mundo) los 3 reintentos fallarán y el pipeline colapsará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzzles. El LLM se puede ``olvidar'' de incluir un ítem importante del objetivo en \verb|world.items| aunque se referencien en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
+
+Como se discutirá en el Capítulo 5, esta fragilidad resultó en algunos mundos que, tras agotar los reintentos, pasaron las validaciones pero presentaron problemas sutiles durante gameplay real, evidenciando que la validación post-generación no puede compensar completamente la inconsistencia inherente del LLM durante la generación.
+
+\paragraph{Debugging mediante JSON estructurado}
+Implementamos serialización completa del estado usando jsonpickle, guardando el mundo en turno 0 con todas las referencias de objetos. Este JSON detectó inconsistencias no evidentes durante gameplay (puzzles existentes pero no presentados, recompensas mencionadas pero no estructuradas). Por ejemplo, el ``Rescue Net'' faltaba en \verb|world.items| pese a estar en \verb|objective.components|—invisible en gameplay pero inmediato en JSON.
+
+\paragraph{Validación final}
+Tras el Paso 4, se verifica tamaño del mundo, conectividad y completabilidad del objetivo. Si fallan, se emiten advertencias pero no se rechaza el mundo (reintentos agotados). En práctica, estas validaciones rara vez fallan si las intermedias fueron exitosas.
+
+\subsection{Lógica de Juego y Ciclo de Interacción} \label{sec:logica_juego}
+
+La lógica de juego implementa un ciclo que combina generación narrativa del LLM con intervenciones determinísticas del sistema. Este enfoque busca generar un equilibrio, y así aprovechar la capacidad creativa del LLM para generar narrativas ricas y responder a acciones impredecibles del jugador, pero sin dejarlo completamente responsable de las mecánicas críticas del juego que, como observamos durante el desarrollo, frecuentemente olvida o ejecuta incorrectamente.
+
+\paragraph{Ciclo básico de interacción}
+El \verb|game_loop| procesa cada acción mediante: (1) detección de comandos especiales, (2) procesamiento estructurado generando \verb|WorldUpdate|, (3) aplicación de cambios vía \verb|world.update_from_structured()|, (4) generación narrativa con segundo LLM, (5) verificación de completitud del objetivo, (6) presentación con estado formateado del mundo.
+
+\paragraph{Quick Actions}
+Implementamos acciones que responden sin invocar al LLM:
+\begin{itemize}
+    \item \textbf{Ver objetivo}: Muestra \verb|objective.description| directamente, con progreso de pistas para misterios
+    \item \textbf{Solicitar ayuda}: Activa sistema de hints adaptativo
+    \item \textbf{Debug} (desarrollo): Inspeccionar mundo (estadísticas, grafo, puzzles) y resumen (ubicaciones, conexiones, inventarios)
+\end{itemize}
+
+\paragraph{Sistema de hints adaptativo}
+Implementado vía \verb|world.update_hints()|, adapta sugerencias según situación: sin puzzle ofrece \verb|objective_hints|; puzzle no iniciado usa \verb|interaction_hint|; puzzle presentado cambia a \verb|puzzle_hints|. Pistas en orden ascendente de especificidad (típicamente 3), rastreando entregadas vía atributo \verb|given|. Se actualiza al cambiar ubicación, proponer puzzle o resolverlo.
+
+\paragraph{Intervenciones del sistema}
+Implementamos intervenciones determinísticas para mecánicas críticas:
+\begin{itemize}
+    \item Proposición forzada de puzzles (intercepta menciones a NPCs)
+    \item Entrega automática de recompensas (\verb|_apply_puzzle_rewards|)
+    \item Desbloqueo automático de pasajes resueltos
+    \item Descubrimiento de pistas de misterio (análisis de narración + marcado automático)
+\end{itemize}
+
+Estas reflejan una lección fundamental: el LLM maneja creatividad narrativa e interpretación de intenciones; el sistema maneja mecánicas determinísticas y validaciones.
+
+\paragraph{Verificación de completitud}
+\verb|check_objective_completion| evalúa cada turno con verificaciones específicas por tipo (inventario para GET\_ITEM, ubicación para REACH\_LOCATION, etc.). Al completarse, presenta narración de cierre y registra éxito en log.
+
+
+
+\section{Integración con LLMs}
+
+\subsection{Modelos estructurados con Pydantic}
+
+La integración con modelos de lenguaje es uno de los desafíos centrales del enfoque neurosimbólico, y en particular con la nueva versión de PAYADOR. Necesitamos que el LLM genere mundos jugables, pero la salida en lenguaje natural no garantiza la coherencia estructural requerida por el motor del juego, o por lo menos implica una dificultad extra no menor. Resolvimos esto mediante un sistema de modelos estructurados con Pydantic que actúa como contrato entre el LLM y el motor.
+
+\paragraph{Motivación y diseño} 
+Los LLMs modernos pueden generar salidas estructuradas en JSON cuando se les solicita explícitamente en el prompt, pero sin validación automática esto resulta fragil, como se comentó anteriormente: el modelo puede omitir campos, usar tipos incorrectos, etc. Implementamos modelos Pydantic que definen esquemas tipados con validaciones embebidas, permitiendo rechazar salidas malformadas antes de que lleguen al motor.
+
+La arquitectura de modelos sigue la jerarquía del mundo de juego. En el nivel superior tenemos \verb|GeneratedWorld|, que encapsula:
+\begin{itemize}
+    \item \texttt{locations: List[GeneratedLocation]} - Ubicaciones con descripciones, conexiones y pasajes bloqueados
+    \item \texttt{items: List[GeneratedItem]} - Objetos con tipo de acción mecánica (\texttt{ItemActionType})
+    \item \texttt{puzzles: List[GeneratedPuzzle]} - Acertijos con respuestas, pistas y recompensas
+    \item \texttt{player: GeneratedCharacter} - Personaje del jugador con ubicación inicial
+    \item \texttt{objective: GeneratedObjective} - Objetivo principal con componentes y condiciones
+\end{itemize}
+
+\paragraph{Enums y restricciones de dominio}
+Definimos enumeraciones para tipos de entidades críticas, forzando al LLM a usar valores válidos. Por ejemplo, \verb|ItemActionType| restringe las acciones de objetos a cuatro categorías que el motor puede procesar: \verb|UNLOCK_PASSAGE| para llaves, \verb|SOLVE_PUZZLE| para pistas, \verb|GIVE_TO_CHARACTER| para entregas y \verb|LORE| para elementos decorativos. Esto elimina la ambigüedad que observamos en iteraciones tempranas donde el modelo generaba acciones inventadas que el motor no reconocía.
+
+Similarmente, \verb|ObjectiveType| restringe los objetivos a cinco tipos implementados: \verb|GET_ITEM|, \verb|REACH_LOCATION|, \verb|FIND_CHARACTER|, \verb|DELIVER_AN_ITEM| y \verb|SOLVE_MYSTERY|. Cada tipo tiene lógica de verificación específica en el motor, y el uso de enums garantiza que no se generen objetivos no soportados.
+
+\paragraph{Reglas de consistencia embebidas}
+Los modelos incorporan reglas de coherencia mediante descripciones de campos que actúan como especificación para el LLM. Por ejemplo, \verb|GeneratedItem| tiene el campo:
+\begin{verbatim}
+is_objective_target: bool = Field(
+    default=False, 
+    description="Whether this item is required to complete the 
+                 main objective. Note: objective targets must 
+                 always be gettable=True"
+)
+\end{verbatim}
+
+Esta descripción instruye al modelo sobre la relación entre \verb|is_objective_target| y \verb|gettable|. Esto es útil tanto para el modelo como para nosotros. Además, observamos que incluir estas anotaciones explícitas en las descripciones reduce significativamente errores de coherencia interna en la salida del LLM. Funcionan como reglas extra por fuera del prompt.
+
+Un caso más complejo es \verb|GeneratedLocation.items|, cuya descripción advierte: \textit{``An item required to unlock a passage CANNOT be placed in the location behind that very passage or any location only accessible through it''}. Esta regla previene configuraciones imposibles donde la llave está del otro lado de la puerta que debe abrir.
+
+\paragraph{Modelos jerárquicos de recompensas}
+Para puzzles implementamos un sistema de recompensas tipadas mediante herencia de Pydantic. \verb|PuzzleReward| es la clase base con \verb|reward_type: RewardType|, y las subclases especializan el comportamiento:
+
+\begin{itemize}
+    \item \verb|PassageReward| - Desbloquea un pasaje entre dos ubicaciones existentes
+    \item \verb|ItemReward| - Otorga un objeto del mundo al inventario del jugador
+    \item \verb|ObjectiveReward| - Marca el objetivo principal como completado
+\end{itemize}
+
+Esta jerarquía le permite al motor aplicar la recompensa correcta automáticamente mediante polimorfismo, y al LLM generar recompensas válidas sin necesidad de lógica condicional compleja en los prompts.
+
+\paragraph{Validación de referencias cruzadas}
+Los esquemas documentan explícitamente las restricciones de referencia mediante anotaciones en las descripciones. Por ejemplo, \verb|GeneratedPuzzle.proposed_by_character| especifica: \textit{``Note: if specified, this character must exist in the world''}. Si bien Pydantic no valida estas referencias automáticamente (requeriría acceso al contexto del mundo completo durante el parsing), estas anotaciones cumplen dos funciones: (1) instruyen al LLM sobre la restricción durante la generación, y (2) documentan las validaciones que luego ejecutamos explícitamente en el pipeline de generación.
+
+Estas validaciones post-parsing incluyen verificar conectividad bidireccional de ubicaciones, existencia de items referenciados en inventarios, y validez de cadenas de dependencias. Las implementamos en funciones especializadas como \verb|verify_location_connectivity()| y \verb|verify_objective_completability()| que rechazan mundos con referencias rotas.
+
+\paragraph{Modelos para el pipeline incremental}
+Para soportar la generación en etapas implementamos modelos intermedios ligeros. \verb|WorldConcept| captura solo el concepto inicial (título, historia de fondo, concepto del jugador, objetivo general), y \verb|WorldSkeleton| define las entidades clave mediante \verb|KeyEntity| (nombre + propósito) sin detalles completos. Esto permite que cada paso del pipeline genere y valide su salida independientemente antes de pasar al siguiente.
+
+\paragraph{Integración con el motor}
+El módulo \verb|world_builder.py| traduce instancias de \verb|GeneratedWorld| a objetos del motor (\verb|World|, \verb|Location|, \verb|Item|, etc.). Este proceso incluye resolución de nombres a referencias de objetos, establecimiento de conexiones bidireccionales y validación de la jugabilidad del mundo resultante. La separación entre modelos de generación (Pydantic) y modelos del motor (clases Python tradicionales, es decir, el estado simbólico) mantiene las responsabilidades claras: Pydantic valida la estructura de la salida del LLM, el motor implementa la lógica de juego.
+
+
+
+\subsection{Memoria persistente con RAG y ChromaDB}
+
+Los LLMs son fundamentalmente sin estado: cada invocación recibe solo el contexto del prompt actual y olvida interacciones previas. Para narrativas interactivas largas esto representa un problema crítico, el jugador puede resolver un puzzle, hablar con un personaje o descubrir información importante en el turno 5, pero para el turno 20 el LLM no tiene acceso a ese contexto a menos que lo incluyamos explícitamente en el prompt. Implementamos un sistema RAG (Retrieval-Augmented Generation) con memoria episódica que transforma PAYADOR de un generador de mundos en un narrador con memoria persistente.
+
+\paragraph{Arquitectura del sistema de memoria}
+El sistema se compone de cuatro componentes que trabajan coordinadamente: \verb|AtomicMemory| como unidad básica de memoria, \verb|EmbeddingService| para generar representaciones vectoriales, \verb|MemoryStore| como base de datos vectorial persistente, y \verb|IntelligentMemorySystem| que coordina la ingestión y recuperación. La figura \ref{fig:rag_overview} ilustra de forma simple el proceso.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{figs/rag-overview.png}
+    \caption{Vista general del sistema de recuperación de recuerdos relevantes para la acción del jugador}
+    \label{fig:rag_overview}
+\end{figure}
+
+\verb|AtomicMemory| encapsula la información de un turno de juego: número de turno, acción del jugador, narración resultante, resumen del estado del mundo y timestamp. Cada memoria puede serializarse a texto mediante \verb|to_text()| para generar embeddings, o a diccionario mediante \verb|to_dict()| para el almacenamiento en ChromaDB. La serialización a diccionario aplana metadatos a tipos primitivos (strings, ints, floats, bools) porque ChromaDB no soporta estructuras anidadas complejas en sus metadatos.
+
+\paragraph{Embeddings semánticos con Gemini}
+\verb|EmbeddingService| genera representaciones vectoriales densas usando el modelo \verb|gemini-embedding-001| de Google. Configuramos el servicio con \verb|task_type="RETRIEVAL_DOCUMENT"| y \texttt{output\_dimensionality=768}, obteniendo embeddings de 768 dimensiones que capturan el significado semántico del texto. Aplicamos normalización L2 a los vectores resultantes como recomienda la documentación de Gemini, lo que mejora la calidad de las búsquedas por similitud coseno.
+
+La elección de embeddings sobre búsqueda léxica tradicional (palabras clave, BM25) permite recuperar memorias conceptualmente relevantes aunque no compartan términos exactos. El beneficio principal que observamos es relativo a la narración, donde se nota que el sistema recuerda eventos pasados y elabora narraciones acorde a lo que se está intentando hacer en el momento y lo que se hizo en el pasado.
+
+\paragraph{Almacenamiento vectorial con ChromaDB}
+\verb|MemoryStore| maneja la persistencia mediante ChromaDB, una base de datos vectorial diseñada para aplicaciones de embeddings. Creamos un \verb|PersistentClient| que escribe en disco (directorio \verb|gamelogs/memory_db|) para que las memorias persistan entre sesiones. Cada mundo de juego tiene su propia colección identificada por \verb|world_id|.
+
+El método \verb|add_memory()| almacena tres elementos por cada memoria: el embedding vectorial para búsquedas de similitud, el documento de texto para recuperación legible, y los metadatos estructurados para filtrado y reconstrucción. Cada memoria recibe un ID único basado en turno y timestamp (\verb|turn_{turn_number}_{timestamp}|).
+
+\verb|search_memories()| ejecuta búsquedas por similitud coseno usando un query embedding como entrada y devolviendo las top-k memorias más relevantes. ChromaDB ordena los resultados por score de similitud automáticamente priorizando memorias semánticamente cercanas a la acción actual.
+
+\paragraph{Sistema coordinador}
+\verb|IntelligentMemorySystem| orquesta el flujo completo de ingestión y recuperación. Durante la ingestión (\verb|ingest_memory()|), el sistema: (1) crea un \verb|AtomicMemory| con los datos del turno, (2) genera su representación textual, (3) computa el embedding mediante \verb|EmbeddingService|, (4) almacena en \verb|MemoryStore| con el vector y metadatos, y (5) actualiza el contador de último turno procesado.
+
+La recuperación (\verb|retrieve_relevant_memories()|) funciona inversamente: (1) recibe la acción actual del jugador, (2) genera su embedding, (3) busca en ChromaDB las memorias más similares, (4) retorna objetos \verb|AtomicMemory| reconstruidos desde los metadatos almacenados. El método \verb|format_memories_for_prompt()| transforma estas memorias en texto estructurado para inyección en el prompt del LLM.
+
+\paragraph{Resúmenes contextuales enriquecidos}
+Para mejorar la calidad de los embeddings implementamos \verb|create_world_state_summary()| en \verb|world_utils.py|, que genera resúmenes ricos del estado del mundo en cada turno. En lugar de almacenar solo ``el jugador tomó la llave'', capturamos: ubicación actual, descripción del lugar (truncada a 100 caracteres), objetos visibles, personajes presentes, inventario del jugador, objeto clave mencionado en la acción y la acción textual completa. Este contexto adicional mejora la recuperación posterior: si el jugador pregunta sobre un personaje, el embedding de la memoria incluye información de dónde estaba ese personaje y qué objetos tenía disponibles, por ejemplo.
+
+\paragraph{Integración con el bucle de juego}
+Integramos el sistema RAG en dos puntos del ciclo de turno en \verb|game_logic.py|. Antes de procesar la acción del jugador, llamamos a \verb|retrieve_relevant_memories()| con el input actual, obtenemos las top-3 memorias más relevantes y las formateamos para inclusión en el prompt mediante \verb|format_memories_for_prompt()|. El prompt \verb|prompt_world_update_structured()| incluye una sección ``Recuerdos Relevantes del Pasado'' o ``Relevant Past Memories'' que precede al estado actual del mundo, con instrucciones explícitas al LLM de considerar esos eventos pasados al generar la respuesta.
+
+Después de procesar exitosamente el turno, ejecutamos \verb|ingest_memory()| con el número de turno, acción del jugador, narración generada y resumen del estado del mundo. Esta ingestión post-turno asegura que cada memoria refleja el resultado final después de aplicar cambios estructurados al mundo, no predicciones intermedias.
+
+\paragraph{Carga de memorias desde MongoDB}
+El método \verb|load_memories_from_db()| permite ``rehidratar'' memorias desde trazas persistidas en MongoDB. Este proceso es útil para cuando un jugador retoma una partida guardada: iteramos sobre los turnos almacenados en la traza, deserializamos el estado del mundo usando \verb|jsonpickle.decode()|, regeneramos el resumen contextual con \verb|create_world_state_summary()|, y reingestamos cada memoria en ChromaDB. Esta rehidratación reconstruye completamente la base vectorial, lo que permite que el sistema de memoria funcione como si el juego nunca se hubiera interrumpido.
+
+La deserialización con jsonpickle es fundamental aquí porque en lugar de trabajar con JSON plano que requeriría reconstrucción manual del mundo, obtenemos directamente instancias completas de \verb|World| con todos sus objetos, métodos y relaciones intactas. Esto nos permite llamar a \verb|create_world_state_summary()| con el objeto \verb|World| real de ese turno histórico para generar resúmenes idénticos a los que se habrían creado durante el juego original.
+
+\paragraph{Observaciones sobre rendimiento}
+El sistema tiene dos puntos de latencia: generación de embeddings (llamadas a la API de Gemini) y búsquedas en ChromaDB. Los embeddings agregan aproximadamente menos de un segundo por turno, pero esto es aceptable porque sucede post-turno de forma asíncrona al jugador (ya vio la narración). Las búsquedas vectoriales en ChromaDB son rápidas incluso con cientos de memorias (< 50ms típicamente) porque usa índices optimizados para similitud coseno. Deshabilitamos telemetría de ChromaDB mediante \verb|ANONYMIZED_TELEMETRY=False| para reducir overhead de red.
+
+Un problema recurrente durante el desarrollo y evaluación fue el manejo de errores en la API de embeddings: si Gemini está temporalmente no disponible, el sistema genera un vector cero como fallback. Esto degrada la calidad de búsquedas pero permite que el juego continúe. Una mejora futura podría ser implementar reintentos con \textit{exponential backoff} para la generación de embeddings.
+
+
+
+\subsubsection{Persistencia de trazas con MongoDB} \label{subsec:mongodb}
+
+El sistema de memoria RAG mantiene contexto semántico, pero para recuperación completa de partidas necesitamos persistir el estado exacto del mundo en cada turno. Implementamos un sistema de trazas con MongoDB que serializa toda la sesión de juego, permitiendo replay completo, debugging de comportamiento del LLM y análisis post partidas.
+
+\paragraph{Arquitectura singleton del handler}
+\verb|MongoHandler| implementa el patrón singleton para tener una única instancia de conexión a la base de datos compartida por todo el sistema. En la construcción, cargamos configuración desde \verb|config.ini| y variables de entorno (\verb|MONGO_URI|), creamos el cliente de PyMongo, seleccionamos database y colección, y ejecutamos \verb|client.admin.command('ping')| para validar conectividad. Si la conexión falla, la instancia se deja como \verb|None| y se imprime el error, permitiendo que el sistema continúe sin persistencia.
+
+\paragraph{Estructura de documentos de traza}
+Cada partida se almacena como un documento MongoDB con la siguiente estructura:
+
+\begin{itemize}
+    \item \verb|world_id|: Identificador único generado como \verb|"generated_{timestamp}"| al inicio de la sesión
+    \item \verb|nickname|: Nombre del jugador (opcional, para organización)
+    \item \verb|language|: Idioma de la partida (español/inglés)
+    \item \verb|narrative_model_name|: Nombre del modelo LLM usado para narración
+    \item \verb|reasoning_model_name|: Nombre del modelo LLM usado para razonamiento
+    \item \verb|inspiration|: Tema o frase inspiradora si se usó modo inspiration (vacío en otros modos)
+    \item \verb|created_at|: Timestamp de creación de la partida
+    \item \verb|turns|: Objeto anidado con turnos indexados numéricamente (0, 1, 2, ...)
+\end{itemize}
+
+Cada entrada en \verb|turns| es un subdocumento que captura el estado completo de ese turno: fecha/hora, input del usuario, estado simbólico del mundo pre-turno (serializado con jsonpickle), estado renderizado del mundo pre-turno (texto legible), predicciones del LLM, cambios estructurados aplicados y narración resultante.
+
+\paragraph{Inicialización de trazas}
+\verb|initialize_trace()| inserta el documento base cuando comienza una nueva partida. Invocado desde \verb|create_game_loop()| después de generar el mundo, el método recibe un diccionario con metadatos de sesión y el turno 0 que contiene el estado inicial del mundo. Usamos \verb|collection.insert_one()| y retornamos el \verb|inserted_id| de MongoDB, aunque este ID rara vez se usa posteriormente (preferimos buscar por \verb|world_id| semántico).
+
+El turno 0 es especial: captura \verb|initial_symbolic_world_state| (mundo completo con \verb|jsonpickle.encode(world, unpicklable=True)|), \verb|initial_rendered_world_state| (representación textual para humanos) y opcionalmente \verb|starting_narration| (primera descripción de la escena). Este turno 0 permite recrear el mundo exactamente como estaba al inicio de la partida.
+
+\paragraph{Adición incremental de turnos}
+\verb|add_turn_to_trace()| agrega turnos subsecuentes usando el operador \verb|$set| de MongoDB. En lugar de recuperar el documento completo, modificarlo en memoria y reescribirlo, usamos \verb|update_one()| con \verb|{"$set": {f"turns.{turn_number}": turn_data}}|. Esta notación con dot notation de MongoDB (\verb|turns.5|) actualiza solo el subdocumento del turno específico, minimizando tráfico de red y previniendo race conditions si múltiples procesos escribieran simultáneamente (aunque PAYADOR es single-player y esto no sucede actualmente).
+
+Invocamos \verb|add_turn_to_trace()| al final de cada ciclo del game loop en \verb|save_game_log()|, después de que la narración final está lista. Los datos del turno incluyen \verb|user_input| (acción del jugador), \verb|previous_symbolic_world_state| (mundo serializado pre-acción con \verb|unpicklable=False| para compatibilidad), \verb|predicted_outcomes| (lo que el LLM predijo que sucedería), \verb|structured_update| (cambios validados aplicados) y \verb|narration| (texto narrativo final).
+
+\paragraph{Serialización con jsonpickle}
+Usamos jsonpickle en lugar de JSON estándar para serializar el objeto \verb|World|. Python pickle puede serializar objetos arbitrarios con referencias circulares y métodos, pero no es legible ni compatible con MongoDB. jsonpickle convierte objetos Python a JSON agregando metadatos de tipo (\verb|"py/object"|) que permiten deserialización precisa.
+
+Configuramos dos modos: \verb|unpicklable=True| en el turno 0 incluye toda la información necesaria para reconstruir el objeto completo con métodos, usado por \verb|create_world_from_trace()| para cargar partidas guardadas. \verb|unpicklable=False| en turnos subsecuentes genera JSON más limpio sin metadatos de reconstrucción, suficiente para análisis y visualización pero no para ejecución.
+
+\paragraph{Recuperación de trazas}
+\verb|get_trace_by_world_id()| recupera el documento completo de una partida mediante \verb|find_one({"world_id": world_id})|. Retorna el documento como diccionario Python con toda la estructura anidada de turnos. Este método es fundamental para el modo replay de la UI: permite al jugador ingresar un \verb|world_id| de partida previa y volver a jugarla, o, para nosotros como desarrolladores, analizar el mundo.
+
+\verb|trace_exists()| verifica existencia sin transferir todo el documento, usando \verb|count_documents()| que retorna 0 o 1. Útil para validación antes de intentar cargar, evitando errores si el usuario ingresa un \verb|world_id| inexistente.
+
+\paragraph{Rehidratación para replay}
+El sistema de memoria RAG usa \verb|load_memories_from_db()| que consume estas trazas: itera sobre \verb|turns|, deserializa cada \verb|previous_symbolic_world_state| con \verb|jsonpickle.decode()|, regenera el resumen contextual y reingesta en ChromaDB. Esta integración entre MongoDB (almacenamiento estructurado completo) y ChromaDB (índice semántico) lo que permite es que el replay no solo restaure el estado del mundo sino también el contexto conversacional.
+
+\paragraph{Consideraciones de diseño}
+La estructura anidada con \verb|turns| como objeto (no array) facilita acceso directo: \verb|turns.5| recupera el turno 5 sin iterar. Esto es eficiente para MongoDB pero requiere conversión a lista ordenada cuando procesamos turnos cronológicamente. La decisión de usar \verb|$set| incremental versus reescribir documento completo prioriza performance sobre atomicidad: si \verb|add_turn_to_trace()| falla, ese turno se pierde pero turnos previos permanecen intactos.
+
+Un desafío observado fue debugging de partidas problemáticas: inicialmente se serializaba solo el estado renderizado (texto), insuficiente para reproducir bugs. Agregar serialización simbólica completa con jsonpickle nos permitió cargar el mundo exacto para encontrar donde ocurrió cierto error y debuggear interactivamente, crítico para diagnosticar comportamiento inesperado del LLM o el motor. En definitiva, esto nos ofrece algo clave para el testing: la reproducibilidad, aunque un error que cometimos es tardar en tener esta feature.
+
+
+\subsection{Estrategias de prompting y manejo de errores}
+
+La interacción con LLMs mediante prompts representa tanto el punto de mayor flexibilidad como el de mayor fragilidad del sistema. Un prompt mal diseñado puede resultar en salidas incoherentes, incompletas o incompatibles con el motor de juego. Desarrollamos estrategias de prompting y manejo de errores que evolucionaron iterativamente a través de múltiples ciclos de prueba y refinamiento.
+
+\paragraph{Jerarquía de prompts especializados}
+Implementamos una librería de prompts diferenciados por función y fase del pipeline. Los prompts de generación incremental (\verb|PROMPT_STEP_1_CONCEPT|, \verb|PROMPT_STEP_2_SKELETON|, \verb|PROMPT_STEP_3_DETAILS|, \verb|PROMPT_STEP_4_PUZZLES|) construyen el mundo en etapas, cada uno con restricciones específicas. Los prompts de juego (\verb|prompt_world_update_structured|, \verb|prompt_narrate_current_scene|) manejan la interacción dinámica con el jugador. Los prompts de utilidad (\verb|prompt_describe_objective|) generan descripciones alternativas de elementos del juego.
+
+Esta separación tiene como objetivo poder ajustar cada prompt independientemente según su contexto de uso. Por ejemplo, \verb|prompt_narrate_current_scene| incluye lógica condicional para la primera visita a una ubicación versus revisitas, modificando las instrucciones para evitar repetir descripciones que el jugador ya conoce.
+
+\paragraph{Reglas embebidas en prompts}
+Los prompts de generación incluyen secciones explícitas de reglas que actúan como especificación ejecutable para el LLM. \verb|PROMPT_STEP_3_DETAILS| contiene bloques de ``RESTRICCIONES TÉCNICAS OBLIGATORIAS'' que detallan:
+\begin{itemize}
+    \item \textbf{Conectividad global}: ``TODAS las ubicaciones deben ser accesibles desde cualquier punto del mundo - NO puede haber ubicaciones aisladas''
+    \item \textbf{Bidireccionalidad}: ``Si A conecta con B, entonces B DEBE conectar con A''
+    \item \textbf{Completabilidad}: ``El objetivo DEBE ser completable con los elementos que crees''
+    \item \textbf{Consistencia de referencias}: ``Todo objeto en inventarios de personajes DEBE existir en la lista de objetos del mundo''
+\end{itemize}
+
+Estas reglas son redundantes con las validaciones posteriores en código, pero observamos que incluirlas en el prompt reduce la cantidad de mundos rechazados en validación. El LLM tiende a seguir instrucciones explícitas cuando están claramente enumeradas y destacadas tipográficamente.
+
+\paragraph{Ejemplos inline y formato esperado}
+Para guiar la salida estructurada incluimos ejemplos concretos directamente en los prompts. Por ejemplo, el prompt para objetivos de misterio muestra:
+\begin{verbatim}
+**EJEMPLO DE PISTAS DE MISTERIO CORRECTAS:**
+{
+  "name": "Huellas fangosas",
+  "description": "Hay huellas fangosas que conducen...",
+  "associated_item": "Botas de jardín",
+  "item_location": "Cobertizo del jardín",
+  ...
+}
+\end{verbatim}
+Este ejemplo inline especifica tanto el formato JSON esperado como el tipo de contenido semántico apropiado. Observamos que los LLMs entienden mejor con ejemplos que con descripciones abstractas, particularmente para estructuras anidadas complejas como las que elaboramos.
+
+\paragraph{Instrucciones multilingües consistentes}
+Todos los prompts principales tienen versiones en español e inglés mantenidas en paralelo. Implementamos funciones dispatcher (\verb|prompt_world_update_structured()|, \verb|prompt_narrate_current_scene()|) que seleccionan la versión correcta según el parámetro \verb|language|. Esta arquitectura facilita mantener coherencia entre idiomas aunque sería complicado agregar soporte más aparte de español e inglés.
+
+Un aspecto crítico es la instrucción de idioma al final de cada prompt: ``La respuesta DEBE estar íntegramente en español. Todos los valores de texto deben ser generados en español. Las claves del JSON deben permanecer en inglés para coincidir con el esquema''.  Tuvimos que agregar esta regla al final de los prompts en español porque las claves de los esquemas están en inglés y el modelo no logra entender, en ocasiones, que el contenido generado debe estar en español.
+
+\paragraph{Validación por capas con reintentos}
+El pipeline de generación implementa validación multicapa después de cada paso, con reintentos automáticos en caso de fallo. Por ejemplo, en \verb|run_step_3_details()| ejecutamos tres validaciones secuenciales:
+
+\begin{enumerate}
+    \item \verb|verify_pydantic_model()| - Valida estructura JSON y tipos
+    \item \verb|verify_location_connectivity()| - Verifica conectividad global mediante DFS
+    \item \verb|verify_objective_completability()| - Valida existencia y accesibilidad de componentes del objetivo
+\end{enumerate}
+
+Si cualquier validación falla, imprimimos el error específico, incrementamos el contador de intentos y regeneramos desde el LLM. Configuramos un máximo de 3 intentos por defecto, lanzando \verb|ValueError| si se agotan. Esto tiene como objetivo permitir recuperación automática de errores transitorios del LLM a la vez que previene loops infinitos.
+
+\paragraph{Verificación de conectividad con DFS}
+\verb|verify_location_connectivity()| implementa búsqueda en profundidad sobre el grafo de ubicaciones para detectar particiones. Construimos un diccionario de adyacencia que incluye tanto conexiones normales como pasajes bloqueados (que son conexiones temporalmente inaccesibles pero estructuralmente presentes), ejecutamos DFS desde la primera ubicación y comparamos el conjunto de nodos visitados contra el conjunto total de ubicaciones. Si detectamos ubicaciones no alcanzables, imprimimos debug detallado con la lista de ubicaciones aisladas y el mapa de adyacencia completo para facilitar el diagnóstico.
+
+\paragraph{Reparación automática de recompensas}
+\verb|verify_puzzle_rewards_and_fix()| implementa una estrategia de reparación además de validación. Si un puzzle otorga como recompensa un objeto que no existe en el mundo, el sistema lo crea automáticamente y lo coloca en el inventario del personaje que propone el puzzle (o en la ubicación del puzzle si es ambiental). Esta heurística refleja una observación del desarrollo: cuando el LLM menciona un objeto recompensa inexistente, generalmente es un olvido coherente con la narrativa, no un error conceptual. Crear el objeto permite continuar la generación en lugar de rechazar todo el mundo.
+
+\paragraph{Manejo de errores de API}
+Los wrappers de modelos (\verb|GeminiModel|, \verb|OpenAIModel|,) implementan manejo robusto de errores de red. Detectamos errores 503 (servicio sobrecargado) y aplicamos reintentos con delay fijo (2 segundos por defecto). Para OpenAI también manejamos rate limiting (error 429) con exponential backoff: el delay se duplica en cada reintento ($2^{attempt}$ segundos).
+
+\verb|prompt_model_structured()| en \verb|GeminiModel| maneja casos especiales de JSON malformado. Si la respuesta incluye marcadores markdown (\verb|```json|), los removemos automáticamente. Implementamos \verb|_is_json_complete()| que valida heurísticamente la completitud del JSON contando llaves y corchetes, detectando respuestas truncadas por límites de tokens. Si detectamos JSON incompleto, reintentamos la generación completa.
+
+\paragraph{Fallbacks y respuestas vacías}
+Cuando se agotan los reintentos, los métodos \verb|prompt_model()| retornan mensajes de error legibles para el usuario (``El modelo está sobrecargado o no respondió''), mientras que \verb|prompt_model_structured()| retorna estructuras vacías válidas mediante \verb|_get_empty_response_for_schema()|. Este método inspecciona el esquema esperado e intenta instanciar un objeto mínimo compatible, priorizando que el sistema continúe funcionando sobre generar contenido rico pero arriesgando crashes.
+
+\paragraph{Detección de JSON truncado}
+Una observación crítica del desarrollo fue que los LLMs ocasionalmente truncan respuestas JSON cuando se aproximan al límite de tokens de salida (\verb|max_output_tokens=8192| para Gemini). Implementamos \verb|_is_json_complete()| que verifica: (1) la respuesta no está vacía, (2) cuenta de llaves de apertura/cierre coincide, (3) cuenta de corchetes de apertura/cierre coincide, y (4) la respuesta termina en llave de cierre. Si detectamos truncamiento, reintentamos con la esperanza de que el LLM genere una versión más concisa que quepa en el límite.
+
+\paragraph{Logging estructurado para debugging}
+Todos los pasos del pipeline imprimen mensajes de progreso y debug con prefijos identificables: \verb|[DEBUG]|, \verb|[WARNING]|, \verb|[ERROR]|. Durante la generación incremental, cada callback de progreso reporta el paso actual y resultados parciales (``Concepto de mundo generado exitosamente'', ``Conectividad de ubicaciones falló en intento 2''). Este logging nos permitió diagnosticar fallos de generación revisando logs de consola sin necesidad de debugger interactivo, algo importante para entender el comportamiento de los modelos en producción.
+
+
+
+
+\section{Interfaz de usuario}
+
+La interfaz de usuario determina cómo los jugadores interactúan con el sistema y experimentan la narrativa generada. Implementamos una interfaz web con Streamlit que balancea accesibilidad para usuarios no técnicos con funcionalidades avanzadas que nos resultaron de utilidad para desarrollo y testing. La figura \ref{fig:interfaz} muestra un vistazo genral a la nueva interfaz de PAYADOR.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figs/interfaz.png}
+    \caption{Nueva interfaz de PAYADOR en Streamlit}
+    \label{fig:interfaz}
+\end{figure}
+
+\subsection{Modos de juego (Preset, Generate, Inspiration)}
+
+Diseñamos tres modos de generación de mundos que ofrecen diferentes niveles de control y previsibilidad, permitiendo que el sistema sirva tanto a jugadores casuales como a testers y desarrolladores.
+
+\paragraph{Modo Inspiration}
+El modo \verb|inspiration| permite al usuario proporcionar una frase o temática que inspira la generación del mundo. Implementamos un campo de texto donde el usuario ingresa conceptos como ``el misterio sobre el robo del cuadro'' o ``exploración espacial en una estación abandonada''. Este input se pasa directamente como parámetro \verb|theme| a \verb|run_step_1_concept()|, iniciando el pipeline incremental.
+
+Agregamos sugerencias populares pre-definidas como botones clickeables: tres categorías temáticas que al hacer click rellenan automáticamente el campo de texto con descripciones más detalladas. Esta funcionalidad reduce la barrera de entrada para usuarios que no saben qué escribir, guiándolos con ejemplos concretos.
+
+La generación desde inspiración ejecuta los cuatro pasos del pipeline de forma secuencial con feedback visual: cada paso muestra su mensaje de progreso (``Paso 1: Generando concepto del mundo...''), actualiza una barra de progreso (20\%, 50\%, 70\%, 90\%) y muestra mensajes de confirmación con detalles (``Concepto creado: 'La Mansión Blackwood'''). Este feedback reduce la ansiedad del usuario durante los 30-60 segundos que toma la generación completa.
+
+\paragraph{Modo Generate}
+El modo \verb|generate| crea mundos completamente aleatorios sin input del usuario. Implementado mediante \verb|create_world_incrementally_generate()|, este modo llama al pipeline con un prompt genérico que solicita al LLM inventar un tema original. Observamos durante el desarrollo que este modo produce mundos variados e inesperados, aunque el ``set de herramientas'' del LLM es ajustado, porque notamos repetición de conceptos, personajes o lugares. Probablemente esto esté relacionado al caching del propio modelo.
+
+Este modo es particularmente útil para testing del sistema: podemos generar decenas de mundos rápidamente para evaluar robustez del pipeline, detectar configuraciones problemáticas y validar que las validaciones de conectividad y completabilidad funcionan correctamente. El botón único ``Generate Random World'' minimiza la fricción, ideal para iteración rápida durante desarrollo.
+
+\paragraph{Modo Preset}
+El modo \verb|preset| carga mundos preconstruidos manualmente desde \verb|example_worlds.py|. Implementamos una interfaz de selección con botones para cada mundo disponible, mostrando título y descripción breve. Los mundos preset son fundamentales durante desarrollo: como están completamente controlados, permiten testear funcionalidad del motor de juego (resolución de puzzles, desbloqueo de pasajes, verificación de objetivos) sin la variabilidad introducida por generación con LLM. 
+
+% Santi: este "fallback" no me suena, es cierto?
+Mantenemos mundos preset en ambos idiomas (español e inglés) mediante diccionarios paralelos, asegurando que la experiencia de testing sea consistente independientemente del idioma seleccionado. Los preset también sirven como fallback: si la generación con LLM falla después de agotar reintentos, el sistema carga automáticamente un mundo preset en lugar de crashear, garantizando que el usuario siempre pueda jugar.
+
+\paragraph{Modos adicionales}
+Implementamos dos modos auxiliares: \verb|tutorial| carga un mundo diseñado específicamente para enseñar mecánicas (mundo pequeño con ejemplos de cada tipo de interacción), y \verb|replay| permite cargar partidas guardadas desde MongoDB mediante \verb|world_id|. El modo replay rehidrata el mundo completo usando \verb|jsonpickle.decode()|, permitiéndole al jugador volver a jugar el mundo si quiere tomar otras decisiones. Además, este modo permite ver la partida jugada (el histórico del chat), también útil para la etapa de evaluación, o los detalles del mismo: el objetivo, las ubicaciones que había, un diagrama visual del mundo, etc.
+
+
+\subsection{UI en Gradio/Streamlit}
+
+Migramos la interfaz de Gradio a Streamlit durante el desarrollo, priorizando mejor integración con el ciclo de desarrollo Python y mayor control sobre layout y componentes personalizados.
+
+\paragraph{Arquitectura de sesión con Streamlit}
+Streamlit usa un modelo de ejecución stateless donde cada interacción re-ejecuta el script completo. Manejamos estado persistente mediante \verb|st.session_state|, un diccionario que sobrevive entre ejecuciones. Almacenamos allí el objeto \verb|World|, el \verb|game_loop|, el historial de chat, ubicaciones visitadas, configuración de idioma y modo de generación. Esta arquitectura requiere cuidado: toda modificación de estado debe hacerse vía \verb|session_state| o se perderá en la siguiente interacción.
+
+Implementamos inicialización condicional al inicio del script: verificamos existencia de cada clave en \verb|session_state| antes de crear valores default. Por ejemplo, \verb|if 'world' not in st.session_state: st.session_state.world = None|. Esta inicialización lazy previene resetear estado cuando el usuario interactúa con otros widgets.
+
+\paragraph{Interfaz de chat conversacional}
+El núcleo de la UI es una interfaz de chat implementada con \verb|st.chat_message()| y \verb|st.chat_input()|. Mantenemos \verb|chat_history| como lista de diccionarios con estructura \verb|\{``role'': ``user''|``assistant'', ``content'': texto\}|. Cada turno agrega dos entradas: una para el input del usuario y otra para la narración generada.
+
+Renderizamos el historial completo en cada ejecución iterando sobre \verb|chat_history|: esto permite scroll infinito natural donde el usuario puede revisar toda la conversación previa. La entrada de chat se posiciona fija en la parte inferior mediante configuración CSS, y automáticamente hace scroll al último mensaje cuando se envía input nuevo.
+
+\paragraph{Quick Actions como UI heurística}
+Implementamos botones de Quick Actions que simulan comandos textuales comunes: ``Objetivo'' envía ``objetivo'' al game loop, ``Ayuda'' envía ``ayuda''. Estos botones reducen fricción para acciones frecuentes.
+
+En modo debug activamos Quick Actions adicionales: ``Inspeccionar'' envía ``inspeccionar mundo'' mostrando estadísticas del grafo de ubicaciones y puzzles, ``Resumen'' muestra todas las ubicaciones con sus conexiones e inventarios. Estas acciones de debugging son esenciales durante desarrollo para validar estado interno sin recurrir a prints en consola.
+
+\paragraph{Visualización del grafo con Mermaid.js}
+Generamos visualizaciones del mundo como diagramas de grafo usando sintaxis Mermaid. El módulo \verb|world_visualizer.py| exporta el mundo a formato Mermaid, y la función \verb|render_mermaid()| en la UI lo renderiza mediante una página HTML embebida con Mermaid.js desde CDN. Implementamos controles de zoom (botones + / - / reset) y pan (arrastrar con mouse) en JavaScript dentro del iframe, permitiendo navegar mundos grandes con muchas ubicaciones.
+
+\paragraph{Sidebar de configuración}
+Implementamos un sidebar persistente con \verb|st.sidebar| que contiene controles de configuración global: selector de idioma (español/inglés), selector de modo de generación (Inspiration/Generate/Preset/Tutorial/Replay), campo de nickname del jugador y toggle de modo debug. Bloqueamos estos controles durante juego activo (\verb|disabled=game_active|) para prevenir cambios de configuración que corrompan el estado del mundo a mitad de partida.
+
+El nickname se almacena en \verb|session_state| y se puede usar para personalización futura, aunque en un principio sólo nos sirvió para identificar a los evaluadores. El toggle de modo debug habilita Quick Actions adicionales y muestra información técnica extra en la UI, útil para desarrollo aunque podría ser confuso para usuarios finales.
+
+\subsection{Experiencia de usuario multilingüe}
+Soportar múltiples idiomas no es solo traducir strings, sino garantizar coherencia narrativa completa en cada idioma sin mixing de lenguajes.
+
+\paragraph{Arquitectura de internacionalización}
+Centralizamos todos los textos de UI en \verb|ui_components.py| mediante funciones \verb|get_ui_texts(language)| y \verb|get_progress_messages(language)| que retornan diccionarios de strings. Cada string tiene una clave invariante (ej. \verb|'GENERATE_WORLD'|) y valores específicos por idioma. La UI consulta estos diccionarios en cada render, seleccionando el idioma desde \verb|st.session_state.language|.
+
+Este patrón centralizado es útil y simple, pero dificulta agregar nuevos idiomas, pues requiere extender los diccionarios con nuevas entradas y manejar la lógica de condicionales, lo que no es práctico. También permite detectar strings faltantes: si una clave no existe en un idioma, Python lanza \verb|KeyError| inmediatamente en lugar de fallar silenciosamente con texto en idioma incorrecto.
+
+\paragraph{Propagación de idioma al pipeline}
+El parámetro \verb|language| se propaga a través de toda la cadena de generación: desde la UI hasta los prompts del LLM. Cada función del pipeline (\verb|run_step_1_concept()|, \verb|run_step_2_skeleton()|, etc.) recibe \verb|language| como parámetro y selecciona el prompt apropiado. Los prompts en \verb|prompts.py| tienen versiones paralelas (funciones con sufijos \verb|_spanish| y \verb|_english|), y funciones dispatcher que seleccionan la versión correcta.
+
+Esta propagación garantiza que todo el contenido generado (nombres de ubicaciones, descripciones de objetos, diálogos de personajes) esté en el idioma seleccionado. Incluimos instrucciones explícitas en los prompts, como se mencionó anteriormente.
+
+\paragraph{Consistencia en memoria y narración}
+El sistema RAG mantiene consistencia de idioma almacenando el parámetro \verb|language| en metadatos de trazas MongoDB. Al cargar memorias con \verb|load_memories_from_db()|, usamos el idioma original de la traza para regenerar resúmenes de estado del mundo, garantizando que las memorias recuperadas estén en el mismo idioma que el juego actual.
+
+Los prompts de narración y actualización de mundo también reciben \verb|language|, asegurando que las respuestas del LLM durante gameplay mantengan el idioma consistentemente. Observamos durante testing que sin esta propagación explícita, los LLMs ocasionalmente cambian de idioma a mitad de narración (ej. nombres propios en inglés dentro de narración española), rompiendo la inmersión.
+
+Un desafío observado fue mantener sincronización entre versiones: si agregamos un objeto a la versión española, debemos recordar agregarlo a la inglesa. Implementamos validaciones básicas que verifican estructura paralela (mismo número de ubicaciones, objetos, personajes) entre versiones, aunque no pueden verificar equivalencia semántica de contenidos.
