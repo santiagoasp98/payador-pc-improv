@@ -401,7 +401,7 @@ Esta etapa establece los fundamentos narrativos del mundo. El modelo de lenguaje
 Esta etapa es análoga al experimento exitoso que realizamos con la descripción narrativa manual: se crea primero el por qué antes que el qué y el cómo.
 
 \paragraph{Diferencias según el modo de generación}
-El prompt de esta etapa difiere significativamente según el modo seleccionado, reflejando las diferentes necesidades de cada aproximación.
+El prompt de esta etapa (disponible en el Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step1}) difiere significativamente según el modo seleccionado, reflejando las diferentes necesidades de cada aproximación:
 
 En el modo \textit{Generate}, el prompt enfatiza la autonomía completa del modelo de lenguaje. Le indicamos explícitamente que tiene libertad para inventar cualquier tipo de historia, con ambientaciones diversas (por ejemplo: medieval, ciencia ficción, moderna, fantástica), personajes únicos con personalidades interesantes, y objetivos desafiantes. También le sugerimos categorías temáticas amplias como inspiración (por ejemplo: misterio, aventura, supervivencia, social, exploración) que puede elegir o combinar libremente, pero sin imponer restricciones. El énfasis está en la creatividad sin límites y en la generación de conceptos originales.
 
@@ -487,7 +487,7 @@ El resultado es una estructura funcional pero lineal, enfocada exclusivamente en
 
 Con el mundo base establecido, esta etapa introduce complejidad mediante pasajes bloqueados (conexiones entre ubicaciones que requieren condiciones específicas para desbloquearse) y puzzles (desafíos clasificados según la taxonomía presentada en la Sección \ref{subsec:clase_puzzle} que obstaculizan el progreso).
 
-El modelo analiza el mundo generado e identifica puntos estratégicos donde insertar estos obstáculos, asegurando que existan soluciones viables y coherentes con la narrativa.
+El modelo analiza el mapa generado e identifica puntos estratégicos donde insertar estos obstáculos, asegurando que existan soluciones viables y coherentes con la narrativa. El prompt para esta etapa se encuentra en el Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step4}.
 
 \paragraph{Evolución del diseño: De cadenas complejas a filosofía guiada}
 Inicialmente, diseñamos esta etapa con la ambición de crear cadenas de dependencias complejas (\textit{dependency chains}): secuencias lógicas de tareas interdependientes donde completar un paso desbloquea el siguiente. La visión era que, por ejemplo, para obtener el objetivo final, el jugador primero necesitaría la Llave A, que solo obtendría del Personaje B, quien la entregaría a cambio del Objeto C, que a su vez requeriría resolver el Puzzle D en la Ubicación E.
@@ -591,7 +591,7 @@ A continuación detallaremos cada uno de estos componentes.
 
 \subsection{Modelos Estructurados con Pydantic}
 
-La integración con modelos de lenguaje es uno de los desafíos centrales del enfoque neurosimbólico, y en particular porque nuestro sistema PAYADOR presenta requisitos que no satisface la versión original de PAYADOR, que fue construida lo más mínima posible para ser expandida. Necesitamos que el modelo de lenguaje genere mundos jugables, pero la salida en lenguaje natural no garantiza la coherencia estructural requerida por el motor del juego, lo cual implica una dificultad técnica significativa. Resolvemos esto usando los modelos de lenguaje junto a la biblioteca Pydantic\footnote{\url{https://docs.pydantic.dev/latest/concepts/models/}}, para que su salida respete una estructura determinada.
+La integración con modelos de lenguaje es uno de los desafíos centrales del enfoque neurosimbólico, y en particular porque nuestro sistema PAYADOR presenta requisitos que no satisface la versión original de PAYADOR, que fue construida lo más mínima posible para ser expandida. Necesitamos que el modelo de lenguaje genere mundos jugables, pero la salida en lenguaje natural no garantiza la coherencia estructural requerida por el motor del juego, lo cual implica una dificultad técnica significativa. Resolvemos esto usando los modelos de lenguaje junto a la biblioteca Pydantic\footnote{Pydantic es una biblioteca de Python para validación de datos usando anotaciones de tipo. Define ``modelos'' que son clases Python con campos tipados y reglas de validación. Ver: \url{https://docs.pydantic.dev/latest/concepts/models/}}, para que su salida respete una estructura determinada.
 
 \paragraph{Motivación y diseño}
 Los modelos de lenguaje modernos pueden generar salidas estructuradas en JSON cuando se les solicita explícitamente en el prompt, pero sin validación automática esto resulta frágil: el modelo puede omitir campos, usar tipos incorrectos, o generar estructuras mal formadas. Implementamos modelos Pydantic que definen esquemas tipados con validaciones embebidas. Cuando el modelo genera una salida que no cumple con el esquema, Pydantic rechaza automáticamente la estructura antes de que llegue al motor del juego, aunque es importante aclarar que Pydantic no reintenta autónomamente la llamada al modelo de lenguaje; esa responsabilidad recae en la lógica del pipeline que describiremos más adelante.
@@ -662,7 +662,7 @@ Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación 
 Como se discutirá en el Capítulo \ref{cap:evaluacion}, esta fragilidad resultó en algunos mundos que, tras agotar los reintentos, pasaron las validaciones pero presentaron problemas sutiles durante el juego real, evidenciando que la validación post-generación no puede compensar completamente la inconsistencia inherente del modelo durante la generación.
 
 \paragraph{Serialización para análisis}
-Implementamos serialización completa del estado usando la biblioteca jsonpickle, guardando el mundo en el turno 0 con todas las referencias de objetos. Este JSON permitió detectar inconsistencias no evidentes durante el juego (puzzles existentes pero no presentados, recompensas mencionadas pero no estructuradas). Por ejemplo, identificamos casos donde un objeto faltaba en \verb|world.items| pese a estar en \verb|objective.components|, lo cual era invisible durante el juego pero inmediato al inspeccionar el JSON.
+Implementamos serialización completa del estado usando la biblioteca jsonpickle, guardando el mundo en el turno 0 con todas las referencias de objetos. Un \textbf{turno} representa una iteración completa del ciclo de juego: el par formado por la acción del jugador y la respuesta del sistema. El \textbf{turno 0} es especial porque representa el estado inicial del mundo antes de cualquier interacción del jugador, incluyendo la narración inicial que describe la escena de apertura. Este JSON permitió detectar inconsistencias no evidentes durante el juego (puzzles existentes pero no presentados, recompensas mencionadas pero no estructuradas). Por ejemplo, identificamos casos donde un objeto faltaba en \verb|world.items| pese a estar en \verb|objective.components|, lo cual era invisible durante el juego pero inmediato al inspeccionar el JSON.
 
 \paragraph{Validación final}
 Tras el Paso 4, se verifica tamaño del mundo, conectividad y completabilidad del objetivo. Si estas validaciones finales fallan, se emiten advertencias pero no se rechaza el mundo porque los reintentos ya fueron agotados. En la práctica, estas validaciones rara vez fallan si las validaciones intermedias fueron exitosas, ya que los problemas críticos habrán sido detectados y corregidos en etapas anteriores.
@@ -723,9 +723,9 @@ Esta sección sobre el ciclo de juego es fundamental porque conecta todos los co
 
 \section{Sistema de Memoria Persistente con RAG}
 
-Los modelos de lenguaje son fundamentalmente sin estado: cada invocación recibe solo el contexto del prompt actual y no tiene acceso a interacciones previas. Para narrativas interactivas largas esto representa un problema crítico: el jugador puede resolver un puzzle, hablar con un personaje o descubrir información importante en el turno 5, pero para el turno 20 el modelo no tiene acceso a ese contexto a menos que lo incluyamos explícitamente en el prompt.
+Los modelos de lenguaje son fundamentalmente sin estado: cada invocación recibe solo el contexto del prompt actual y no tiene acceso a interacciones previas. Para narrativas interactivas largas esto representa un problema crítico: el jugador puede resolver un puzzle, hablar con un personaje o descubrir información importante en el turno 5, pero para el turno 20 el modelo no tiene acceso a ese contexto a menos que lo incluyamos explícitamente en el prompt. Incluir todo el historial completo en cada prompt rápidamente excede los límites de longitud de contexto y aumenta significativamente los costos computacionales de cada invocación.
 
-Para intentar resolver este problema, implementamos un sistema RAG (Retrieval-Augmented Generation) con memoria episódica. Es importante aclarar que RAG no es un proceso simbólico sino estadístico, por lo que puede fallar. No obstante, consideramos que se justifica implementarlo porque el sistema simbólico por sí solo no puede mantener un historial narrativo coherente de todos los eventos pasados sin exceder los límites de longitud del prompt. RAG permite seleccionar selectivamente los recuerdos más relevantes para cada acción, lo cual fue una diferencia notable con respecto a PAYADOR original, que no tenía memoria más allá del sistema simbólico.
+Para intentar resolver este problema, implementamos un sistema \textbf{RAG} (\textit{Retrieval-Augmented Generation}, Generación Aumentada por Recuperación) con memoria episódica. RAG es una técnica que combina recuperación de información con generación de texto: primero busca información relevante en una base de datos y luego la inyecta en el prompt del modelo para enriquecer su respuesta. Es importante aclarar que RAG no es un proceso simbólico sino estadístico, por lo que puede fallar. No obstante, consideramos que se justifica implementarlo porque el sistema simbólico por sí solo no puede mantener un historial narrativo coherente de todos los eventos pasados sin exceder los límites de longitud del prompt. RAG permite seleccionar los recuerdos más relevantes para cada acción, lo cual fue una diferencia notable con respecto a PAYADOR original, pero no con tanto impacto como esparábamos. Al final, la única utilidad que tuvo el RAG fue con respecto a la narración; el sistema es capaz de recordar eventos pasados y hacer alusión a ellos. Como veremos en la parte de experimentación, algunos jugadores destacaron esto como algo muy positivo.
 
 \subsection{Arquitectura del Sistema de Memoria}
 
@@ -781,17 +781,9 @@ Integramos el sistema RAG en dos puntos del ciclo de turno en \verb|game_logic.p
 
 Después de procesar exitosamente el turno, ejecutamos \verb|ingest_memory()| con el número de turno, acción del jugador, narración generada y resumen del estado del mundo. Esta ingestión post-turno asegura que cada memoria refleja el resultado final después de aplicar cambios estructurados al mundo, no predicciones intermedias.
 
-\subsection{Carga de Memorias desde MongoDB}
-
-El método \verb|load_memories_from_db()| permite recuperar memorias desde trazas persistidas en MongoDB, proceso que explicamos como ``rehidratación'' en el sentido de que reconstruye la base vectorial de memorias desde el almacenamiento persistente. Este proceso es útil cuando un jugador retoma una partida guardada: iteramos sobre los turnos almacenados en la traza, deserializamos el estado del mundo usando \verb|jsonpickle.decode()|, regeneramos el resumen contextual con \verb|create_world_state_summary()|, y reingestamos cada memoria en ChromaDB.
-
-La deserialización con jsonpickle es fundamental porque obtenemos directamente instancias completas de \verb|World| con todos sus objetos, métodos y relaciones intactas, en lugar de trabajar con JSON plano que requeriría reconstrucción manual del mundo. Esto nos permite llamar a \verb|create_world_state_summary()| con el objeto \verb|World| real de ese turno histórico.
-
 \subsection{Consideraciones de Rendimiento}
 
 El sistema tiene dos puntos de latencia: generación de embeddings (mediante llamadas a la API de Gemini) y búsquedas en ChromaDB. Los embeddings agregan menos de un segundo por turno, pero esto es aceptable porque sucede post-turno (una vez que el jugador ya vio la narración), de forma no bloqueante para la experiencia. Las búsquedas vectoriales en ChromaDB son rápidas incluso con cientos de memorias, típicamente de unos 50ms en total, porque usa índices optimizados para similitud coseno.
-
-Deshabilitamos telemetría de ChromaDB mediante \verb|ANONYMIZED_TELEMETRY=False|. La telemetría de ChromaDB es un sistema de recolección de métricas de uso que la biblioteca envía a sus servidores; deshabilitarla reduce el overhead de red.
 
 Un problema recurrente durante el desarrollo y evaluación fue el manejo de errores en la API de embeddings: si Gemini está temporalmente no disponible, el sistema genera un vector con todas sus entradas en cero como fallback. Esto degrada la calidad de búsquedas pero permite que el juego continúe. Una mejora futura sería implementar reintentos con exponential backoff (es decir, esperar un tiempo creciente entre reintentos: 1s, 2s, 4s, 8s, etc.) para la generación de embeddings, lo cual aumentaría la robustez del sistema ante fallos transitorios de la API.
 
@@ -834,7 +826,7 @@ El turno 0 es especial: captura \verb|initial_symbolic_world_state| (mundo compl
 
 \subsection{Serialización con jsonpickle}
 
-Usamos jsonpickle en lugar de JSON estándar para serializar el objeto \verb|World|. Python pickle puede serializar objetos arbitrarios con referencias circulares y métodos, pero no es legible ni compatible con MongoDB. jsonpickle convierte objetos Python a JSON agregando metadatos de tipo que permiten deserialización precisa.
+Usamos la biblioteca jsonpickle en lugar de JSON estándar para serializar el objeto \verb|World|. La \textbf{serialización completa} se refiere a convertir objetos Python complejos (con atributos, métodos y referencias entre objetos) en una representación de texto que preserve toda su información estructural. Python pickle puede serializar objetos arbitrarios con referencias circulares y métodos, pero genera formato binario no legible por humanos ni compatible con MongoDB. jsonpickle resuelve esto convirtiendo objetos Python a JSON agregando metadatos de tipo (como \texttt{"py/object"}) que permiten deserialización precisa, reconstruyendo el objeto original con toda su funcionalidad.
 
 Configuramos dos modos: \verb|unpicklable=True| en el turno 0 incluye toda la información necesaria para reconstruir el objeto completo con métodos, usado por \verb|create_world_from_trace()| para cargar partidas guardadas. \verb|unpicklable=False| en turnos subsecuentes genera JSON más limpio sin metadatos de reconstrucción, suficiente para análisis y visualización pero no para ejecución.
 
