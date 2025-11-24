@@ -55,7 +55,7 @@ La nueva arquitectura modela explícitamente:
 \begin{itemize}
     \item \textbf{Personajes con propósito}: Cada personaje relevante para la narrativa tiene algo útil para el jugador (p. ej.: información, objetos) y establece condiciones claras para obtenerlo (p. ej.: resolver un puzle, entregar un objeto).
     \item \textbf{puzles con consecuencias}: Su resolución produce efectos tangibles modelados directamente en su definición: entregar objetos específicos, desbloquear pasajes concretos, o revelar información necesaria para el objetivo.
-    \item \textbf{objetos funcionales}: Los objetos tienen roles definidos en la progresión narrativa, ya sea como requisitos para puzles, moneda de intercambio con personajes, o componentes directos del objetivo.
+    \item \textbf{objetos funcionales}: Los objetos tienen roles definidos en la progresión narrativa, ya sea como requisitos para puzles, moneda de intercambio con personajes, o componentes del objetivo (ver \ref{subsec:clase_objective}).
     \item \textbf{Ubicaciones con significado}: Contienen elementos críticos para el avance o sirven como puntos de conexión en la red de dependencias del mundo.
 \end{itemize}
 
@@ -111,7 +111,7 @@ Para garantizar la jugabilidad del mundo generado, implementamos validaciones es
     \item \textbf{Alcanzabilidad del objetivo}: El objetivo debe ser completable considerando la estructura espacial del mundo y los elementos disponibles. Debe existir al menos una ruta válida desde el estado inicial hasta la consecución del objetivo.
 \end{itemize}
 
-Estas reglas se especifican explícitamente en el prompt del Paso 3 del pipeline (que se describirá en la Sección \ref{sec:pipeline}), guiando al modelo de lenguaje a generar estructuras espaciales coherentes y navegables. Sin embargo, dado que el modelo puede fallar en mantener estas restricciones, implementamos una \textbf{verificación automática post-generación} que valida la conectividad mediante búsqueda en profundidad (DFS). Esta función construye un grafo de adyacencia considerando tanto conexiones normales como pasajes bloqueados (que son conexiones estructurales, solamente que temporalmente inaccesibles), y verifica que todas las ubicaciones sean alcanzables desde cualquier punto de partida. Si la validación falla, el sistema reporta qué ubicaciones quedaron aisladas, permitiendo detectar y corregir mundos con estructuras espaciales inválidas antes de que lleguen al jugador.
+Estas reglas se especifican explícitamente en el prompt de la Etapa 3 del pipeline (que se describirá en la Sección \ref{sec:pipeline}), guiando al modelo de lenguaje a generar estructuras espaciales coherentes y navegables. Sin embargo, dado que el modelo puede fallar en mantener estas restricciones, implementamos una \textbf{verificación automática post-generación} que valida la conectividad mediante búsqueda en profundidad (DFS). Esta función construye un grafo de adyacencia considerando tanto conexiones normales como pasajes bloqueados (que son conexiones estructurales, solamente que temporalmente inaccesibles), y verifica que todas las ubicaciones sean alcanzables desde cualquier punto de partida. Si la validación falla, el sistema reporta qué ubicaciones quedaron aisladas, permitiendo detectar y corregir mundos con estructuras espaciales inválidas antes de que lleguen al jugador.
 
 \subsection{Clase Item}
 
@@ -119,7 +119,7 @@ La clase \verb|Item| representa los objetos interactuables del mundo. Al igual q
 
 El único atributo específico de \verb|Item| es \verb|gettable| (booleano), que determina si el objeto puede ser tomado por el jugador y añadido a su inventario. Esta propiedad simple tiene implicaciones profundas para el diseño del mundo: algunos objetos deben ser portables para permitir la progresión (p. ej.: llaves, herramientas), mientras que otros actúan como elementos fijos del entorno (p. ej.: muebles, estructuras arquitectónicas). El contexto narrativo también influye: sería incoherente que el jugador pudiera cargar un tanque de agua o mover una estatua monumental.
 
-En el Paso 3 del pipeline, establecimos reglas explícitas sobre el uso de \verb|gettable|:
+En la Etapa 3 del pipeline, establecimos reglas explícitas sobre el uso de \verb|gettable|:
 \begin{itemize}
     \item Todo objeto necesario para completar el objetivo principal debe ser \verb|gettable=True|, garantizando que el jugador pueda obtenerlo.
     \item Los objetos que bloquean pasajes pueden ser \verb|gettable=True| (se desbloquea al tomarlos) o \verb|gettable=False| (requieren otra solución, como un puzle).
@@ -151,7 +151,7 @@ La clase \verb|Character| representa tanto al jugador como a los personajes no j
     \item \textbf{interaction}: Datos estructurados de interacción provenientes del proceso de generación, que incluyen información sobre puzles propuestos y condiciones de intercambio
 \end{itemize}
 
-Durante el Paso 3 del pipeline, establecimos reglas para garantizar que los NPCs generados sean funcionalmente coherentes:
+Durante la Etapa 3 del pipeline, establecimos reglas para garantizar que los NPCs generados sean funcionalmente coherentes:
 \begin{itemize}
     \item Si un personaje tiene capacidad de interacción, debe contar con texto de interacción definido. Este texto se utiliza cuando el sistema presenta automáticamente un puzle asociado al personaje, garantizando una transición narrativa fluida entre la exploración y el desafío.
     \item Todo objeto en el inventario de un personaje debe existir en la lista global de objetos del mundo, evitando referencias inexistentes.
@@ -247,7 +247,7 @@ La clase \verb|Objective| experimentó cambios sustanciales respecto a la implem
 \begin{itemize}
     \item \textbf{type}: Tipo de objetivo según la taxonomía que describiremos a continuación
     \item \textbf{components}: Lista de componentes involucrados (p. ej.: objetos, personajes, ubicaciones). Todos los componentes referenciados deben existir en el mundo
-    \item \textbf{description}: Descripción clara de lo que el jugador debe lograr (p.~ej.: ``Debes encontrar el medallón dorado escondido en la mansión'')
+    \item \textbf{description}: Descripción clara de lo que el jugador debe lograr (p. ej.: ``Debes encontrar el medallón dorado escondido en la mansión'')
     \item \textbf{success\_conditions}: Condiciones específicas que deben cumplirse para completar el objetivo
     \item \textbf{completion\_narration}: Descripción narrativa de lo que sucede tras completar el objetivo. Este atributo no se usa en objetivos de tipo \verb|solve_mystery| porque estos tienen su propio mecanismo de conclusión mediante \verb|mystery_solution|
     \item \textbf{objective\_hints}: Las pistas siempre son tres y se entregan en orden de más general a más específica, proporcionando ayuda progresiva al jugador
@@ -255,7 +255,7 @@ La clase \verb|Objective| experimentó cambios sustanciales respecto a la implem
     \item \textbf{mystery\_solution}: Solución del misterio. Solo se usa para objetivos de tipo \verb|solve_mystery|
 \end{itemize}
 
-Definimos cinco tipos de objetivos, algunos inspirados en los mundos diseñados originalmente para evaluar PAYADOR \cite{gervas2022payador} y otros completamente nuevos:
+Definimos cinco tipos de objetivos, algunos inspirados en los mundos diseñados originalmente para evaluar PAYADOR \cite{gongora2024payador} y otros completamente nuevos:
 
 \begin{itemize}
     \item \textbf{REACH\_LOCATION}: La posición del personaje del jugador debe alcanzar un valor específico correspondiente a una ubicación objetivo
@@ -337,19 +337,19 @@ La generación directa requiere que el modelo genere simultáneamente la histori
 
 Para entender y caracterizar mejor estos problemas, realizamos un experimento controlado: en lugar de solicitar que el modelo generara todo el mundo de una vez, le proporcionamos manualmente una descripción narrativa (\textit{backstory}) completa y detallada, inspirada en uno de los mundos diseñados originalmente para evaluar PAYADOR \cite{gongora2024payador}. A partir de esta descripción en lenguaje natural, solicitamos que construyera la estructura del mundo. Los resultados fueron significativamente superiores: el modelo logró crear un mundo considerablemente más consistente, con la mayoría de los elementos correctamente ubicados y conectados lógicamente.
 
-Si bien el enfoque incremental no elimina completamente los errores de generación—particularmente en mundos de alta complejidad donde el modelo puede omitir elementos o crear inconsistencias—la frecuencia y severidad de estos problemas se redujo drásticamente en comparación con el enfoque de generación directa. Este resultado reveló que el problema principal no era la capacidad del modelo para estructurar mundos coherentes, sino la carga de tener que inventar y estructurar simultáneamente. Inspirado en esos experimentos preliminares, propusimos que la creación del mundo se dé en pasos incrementales, permitiendo que:
+Si bien el enfoque incremental no elimina completamente los errores de generación—particularmente en mundos de alta complejidad donde el modelo puede omitir elementos o crear inconsistencias—la frecuencia y severidad de estos problemas se redujo drásticamente en comparación con el enfoque de generación directa. Este resultado reveló que el problema principal no era la capacidad del modelo para estructurar mundos coherentes, sino la carga de tener que inventar y estructurar simultáneamente. Inspirado en esos experimentos preliminares, propusimos que la creación del mundo se dé en etapas incrementales, permitiendo que:
 
 \begin{itemize}
     \item Cada etapa se enfoque en un aspecto específico del mundo
     \item Los prompts puedan ser más explícitos sin exceder límites de longitud
     \item Las salidas validadas de etapas anteriores sirvan como contexto para etapas posteriores
     \item El modelo mantenga mejor coherencia al trabajar con tareas más acotadas
-    \item Exista intervención simbólica y validación entre pasos, donde el sistema verifica automáticamente la coherencia estructural
+    \item Exista intervención simbólica y validación entre etapas, donde el sistema verifica automáticamente la coherencia estructural
 \end{itemize}
 
 \subsection{Etapas del Pipeline}
 
-\subsubsection{Paso 1: El Núcleo de la Aventura}
+\subsubsection{Etapa 1: El Núcleo de la Aventura}
 
 Esta etapa establece los fundamentos narrativos del mundo. El modelo de lenguaje recibe como entrada una idea del usuario (en el modo \textit{Inspiration}) o genera una propuesta original (modo \textit{Generate}), produciendo:
 
@@ -366,15 +366,13 @@ El prompt de esta etapa (disponible en el Anexo \ref{anexo:prompts}, Sección \r
 
 En el modo \textit{Generate}, el prompt enfatiza la autonomía completa del modelo de lenguaje. Le indicamos explícitamente que tiene libertad para inventar cualquier tipo de historia, con ambientaciones diversas (p. ej.: medieval, ciencia ficción, moderna, fantástica), personajes únicos con personalidades interesantes, y objetivos desafiantes. También le sugerimos categorías temáticas amplias como inspiración (p. ej.: misterio, aventura, supervivencia, social, exploración) que puede elegir o combinar libremente, pero sin imponer restricciones. El énfasis está en la creatividad sin límites y en la generación de conceptos originales.
 
-Sin embargo, durante las pruebas iniciales con el modo \textit{Inspiration}, observamos un problema recurrente: aunque mencionábamos el tema proporcionado por el usuario al inicio del prompt, el modelo tendía a generar mundos donde solamente la ambientación general guardaba relación con la temática. Los NPCs, puzles y especialmente el objetivo principal frecuentemente se desviaban hacia elementos genéricos sin conexión clara con el tema especificado. Por ejemplo, en un mundo con tema ``piratas del Caribe'', podríamos obtener una ambientación pirata pero con un objetivo de resolver un acertijo matemático abstracto, o NPCs con motivaciones completamente desvinculadas del contexto pirata.
-
-Para resolver este problema, diseñamos una estrategia de \textbf{reiteración temática constante} en el prompt. En lugar de mencionar el tema una sola vez, lo reforzamos en múltiples secciones, estableciendo que el tema proporcionado debe ser la base fundamental de todo el concepto del mundo, que cada ubicación, personaje, objeto y especialmente el objetivo principal deben ser manifestaciones directas del tema, que el modelo no debe inventar elementos desconectados, que los personajes deben representar diferentes facetas del tema, que el objetivo principal debe estar intrínsecamente relacionado con la temática, y que los puzles imaginados para etapas posteriores deben surgir naturalmente del tema.
+Sin embargo, durante las pruebas iniciales con el modo \textit{Inspiration}, observamos un problema recurrente: aunque mencionábamos el tema proporcionado por el usuario al inicio del prompt, el modelo tendía a generar mundos donde solamente la ambientación general guardaba relación con la temática. Los NPCs, puzles y especialmente el objetivo principal frecuentemente se desviaban hacia elementos genéricos sin conexión clara con el tema especificado. Por ejemplo, en un mundo con tema ``piratas del Caribe'', podríamos obtener una ambientación pirata pero con un objetivo de resolver un acertijo matemático abstracto, o NPCs con motivaciones completamente desvinculadas del contexto pirata. Para resolver este problema, diseñamos una estrategia de reiteración temática constante en el prompt. En lugar de mencionar el tema una sola vez, lo reforzamos en múltiples secciones, estableciendo que el tema proporcionado debe ser la base fundamental de todo el concepto del mundo, que cada ubicación, personaje, objeto y especialmente el objetivo principal deben ser componentes intrínsecamente ligados al tema, que el modelo no debe proponer elementos desconectados, que los personajes deben asumir roles que muestren distintas dimensiones del tema, que el objetivo principal debe estar intrínsecamente relacionado con la temática, y que los puzles imaginados para etapas posteriores deben surgir naturalmente del tema.
 
 Esta reiteración constante resultó ser clave para mantener la coherencia temática. Al enfatizar la obligación temática en cada sección relevante del prompt (no solamente al principio), logramos que el modelo mantuviera la coherencia temática no únicamente en la ambientación superficial, sino en todos los elementos estructurales del mundo, especialmente en aquellos que afectan directamente la jugabilidad como el objetivo, los puzles futuros y las motivaciones de los NPCs.
 
-\subsubsection{Paso 2: El Esqueleto del Mundo}
+\subsubsection{Etapa 2: El Esqueleto del Mundo}
 
-Una vez establecido el núcleo narrativo en el Paso 1, esta etapa identifica las entidades principales necesarias para completar el objetivo. El modelo determina las ubicaciones clave en la secuencia de acciones necesarias para llegar al objetivo, los personajes relevantes para la narrativa, los objetos necesarios para completar el objetivo, y las relaciones preliminares entre estas entidades.
+Una vez establecido el núcleo narrativo en la Etapa 1, esta etapa identifica las entidades principales necesarias para completar el objetivo. El modelo determina las ubicaciones clave en la secuencia de acciones necesarias para llegar al objetivo, los personajes relevantes para la narrativa, los objetos necesarios para completar el objetivo, y las relaciones preliminares entre estas entidades.
 
 En esta etapa se utilizan parámetros de configuración especificados por el usuario (o usando otros por defecto), que permiten controlar explícitamente el tamaño y complejidad del mundo:
 
@@ -417,19 +415,19 @@ La salida de esta etapa es una lista de entidades sin detalles exhaustivos, func
 }
 \end{verbatim}
 \end{minipage}
-\caption{Ejemplo de esqueleto de mundo generado en el Paso 2}
+\caption{Ejemplo de esqueleto de mundo generado en la Etapa 2}
 \label{fig:ejemplo_esqueleto}
 \end{figure}
 
-\subsubsection{Paso 3: El Mundo Jugable}
+\subsubsection{Etapa 3: El Mundo Jugable}
 
-Esta etapa materializa el esqueleto agregando detalles descriptivos y funcionales: descripciones textuales de ubicaciones, atributos de personajes (p. ej.: diálogos, motivaciones), propiedades de objetos (p. ej.: portabilidad, usabilidad), y conexiones entre ubicaciones.
+Esta etapa materializa el esqueleto agregando detalles descriptivos y funcionales: descripciones textuales de ubicaciones, atributos de personajes (p. ej.: descripciones, el lugar donde está), propiedades de objetos (p. ej.: el nombre, si se puede agarrar), y conexiones entre ubicaciones.
 
-Con el esqueleto ya definido en el Paso 2, diseñamos el prompt de esta etapa (disponible en el Anexo \ref{anexo:prompts}) para ser significativamente más específico sobre los requisitos de cada elemento, evitando las omisiones observadas en la generación directa.
+Con el esqueleto ya definido en la Etapa 2, diseñamos el prompt de esta etapa (disponible en el Anexo \ref{anexo:prompts}) para ser significativamente más específico sobre los requisitos de cada elemento, evitando las omisiones observadas en la generación directa.
 
 En esta etapa se asignan explícitamente ubicaciones a todos los objetos y personajes, resolviendo el problema de elementos sin posición definida que observamos en experimentos preliminares. El prompt especifica que cada personaje debe estar ubicado en un lugar que existe en el mundo, y cada objeto debe tener una ubicación inicial definida o estar en el inventario de algún personaje.
 
-Como el tamaño del mundo se fijó en el Paso 2, en esta etapa se le indica claramente al modelo que no debe agregar ubicaciones ni elementos nuevos que no formen parte del esqueleto existente. Esta medida surgió como respuesta a un patrón observado en experimentos preliminares, donde el modelo tendía a expandirse más allá del alcance definido e incluir contenido adicional.
+Como el tamaño del mundo se fijó en la Etapa 2, en esta etapa se le indica claramente al modelo que no debe agregar ubicaciones ni elementos nuevos que no formen parte del esqueleto existente. Esta medida surgió como respuesta a un patrón observado en experimentos preliminares, donde el modelo tendía a expandirse más allá del alcance definido e incluir contenido adicional.
 
 Adicionalmente, establecimos reglas obligatorias de conexión entre ubicaciones. Si la ubicación A conecta con B, entonces B debe conectar con A, evitando conexiones unidireccionales accidentales que podrían atrapar al jugador. Todas las ubicaciones deben ser accesibles desde cualquier punto del mundo, sin ubicaciones aisladas o grupos desconectados. Finalmente, el objetivo debe ser completable con los elementos creados, existiendo al menos una ruta lógica desde el estado inicial hasta su consecución.
 
@@ -437,15 +435,15 @@ Diseñamos reglas para garantizar la consistencia funcional. Los personajes con 
 
 Incorporamos en el prompt una lista de verificación que el modelo debe ejecutar antes de finalizar la generación: todas las ubicaciones deben ser accesibles desde la ubicación inicial, el jugador debe poder completar el objetivo con los elementos disponibles, debe existir al menos una ruta de solución desde el estado inicial, todos los elementos referenciados deben existir efectivamente, y en objetivos de tipo misterio, cada pista debe estar asociada a un objeto físico existente.
 
-El resultado es una estructura funcional pero lineal, enfocada exclusivamente en la ruta principal hacia el objetivo. El mundo en este punto (es decir, el mundo generado en el paso 3) es jugable y completable, aunque aún carece de los puzles y pasajes bloqueados que añadirán complejidad en la siguiente etapa.
+El resultado es una estructura funcional pero lineal, enfocada exclusivamente en la ruta principal hacia el objetivo. El mundo en este punto (es decir, el mundo generado en la Etapa 3) es jugable y completable, aunque aún carece de los puzles y pasajes bloqueados que añadirán complejidad en la siguiente etapa.
 
-\subsubsection{Paso 4: Los Desafíos}
+\subsubsection{Etapa 4: Los Desafíos}
 
 Con el mundo base establecido, esta etapa introduce complejidad mediante pasajes bloqueados (conexiones entre ubicaciones que requieren condiciones específicas para desbloquearse) y puzles (desafíos clasificados según la taxonomía presentada en la Sección \ref{subsec:clase_puzzle} que obstaculizan el progreso).
 
-El modelo analiza el mapa generado e identifica puntos estratégicos donde insertar estos obstáculos, asegurando que existan soluciones viables y coherentes con la narrativa. El prompt para esta etapa se encuentra en el Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step4}.
+El modelo analiza el mundo generado e identifica puntos estratégicos donde insertar estos obstáculos, asegurando que existan soluciones viables y coherentes con la narrativa. El prompt para esta etapa se encuentra en el Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step4}.
 
-Inicialmente, diseñamos esta etapa con la ambición de crear cadenas de dependencias complejas (\textit{dependency chains}): secuencias lógicas de tareas interdependientes donde completar un paso desbloquea el siguiente. La visión era que, por ejemplo, para obtener el objetivo final, el jugador primero necesitaría la Llave A, que solo obtendría del Personaje B, quien la entregaría a cambio del Objeto C, que a su vez requeriría resolver el Puzle D en la Ubicación E.
+Inicialmente, diseñamos esta etapa con la ambición de crear cadenas de dependencias complejas (\textit{dependency chains}): secuencias lógicas de tareas interdependientes donde completar una etapa desbloquea la siguiente. La visión era que, por ejemplo, para obtener el objetivo final, el jugador primero necesitaría la Llave A, que solo obtendría del Personaje B, quien la entregaría a cambio del Objeto C, que a su vez requeriría resolver el Puzle D en la Ubicación E.
 
 Sin embargo, al hacer experimentos preliminares esta estructura demostró ser problemática. El modelo fallaba consistentemente al generar estas cadenas, produciendo mundos con errores estructurales graves (p. ej.: dependencias circulares imposibles de resolver donde A requiere B, B requiere C y C requiere A; referencias a objetos que no existían en los inventarios correctos; o generaciones sin sentido donde las relaciones de dependencia no tenían lógica coherente).
 
@@ -459,19 +457,19 @@ El prompt enfatiza la conexión entre cada puzle y un pasaje bloqueado o recurso
 
 Durante las primeras pruebas observamos puzles excesivamente complejos, donde el jugador podía quedar bloqueado sin una vía clara de avance. Para resolverlo, implementamos un sistema obligatorio de pistas asociado a cada puzle, compuesto por tres a cinco pistas progresivas (\textit{puzle\_hints}) que van desde una orientación general hasta una ayuda casi explícita. La efectividad de este sistema motivó la creación de pistas para los objetivos, con el fin de mantener coherencia en la asistencia ofrecida al jugador. Más adelante surgió la idea de extender este enfoque a situaciones en las que el jugador se encontrara en una ubicación con un puzle aún no iniciado, naciendo así la pista de interacción (\textit{interaction\_hint}): una sugerencia breve que orienta al jugador sobre cómo comenzar la acción (por ejemplo: ``intenta hablar con [personaje]'', ``examina [objeto]'', ``busca pistas en esta ubicación''). Este enfoque consolidó un sistema de ayuda más orgánico y adaptativo, que se integra con el mecanismo general que se describirá en la Sección \ref{sec:sistema_hints} del Capítulo \ref{cap:implementacion}.
 
-En esta etapa se mantuvieron las mismas restricciones técnicas definidas en el Paso 3, que limitan la capacidad del modelo para alterar la estructura del mundo: no se permite crear nuevas ubicaciones, deben preservarse las rutas de conectividad global entre ellas, y se prohíben mecánicas de combinación o transformación de objetos, dado que el motor del juego no las soporta. Adicionalmente, si un puzle otorgado por un personaje incluye una recompensa física, el objeto correspondiente debe existir previamente y encontrarse en el inventario de dicho personaje.
+En esta etapa se mantuvieron las mismas restricciones técnicas definidas en la Etapa 3, que limitan la capacidad del modelo para alterar la estructura del mundo: no se permite crear nuevas ubicaciones, deben preservarse las rutas de conectividad global entre ellas, y se prohíben mecánicas de combinación o transformación de objetos, dado que el motor del juego no las soporta. Adicionalmente, si un puzle otorgado por un personaje incluye una recompensa física, el objeto correspondiente debe existir previamente y encontrarse en el inventario de dicho personaje.
 
 Sobre esta base, el modelo cuenta con cierta libertad para realizar una redistribución estratégica de los objetos del mundo, con el fin de ajustar la dificultad y el equilibrio narrativo. Esto implica poder mover elementos relevantes a ubicaciones menos accesibles o asignarlos a personajes que los entreguen mediante intercambio, siempre que la modificación mantenga coherencia lógica y motivación narrativa dentro del contexto del mundo.
 
 El resultado de esta etapa es un mundo con obstáculos estratégicamente distribuidos que hacen la experiencia más desafiante. Aunque no implementamos cadenas de dependencias formales, los puzles generados mantienen coherencia narrativa y progresión lógica gracias a la filosofía de diseño preservada en el prompt.
 
-\subsubsection{Paso 5: Expansión del Mundo (Opcional)}
+\subsubsection{Etapa 5: Expansión del Mundo (Opcional)}
 
 La etapa final enriquece el mundo con contenido extra que incrementa la inmersión: ubicaciones secundarias que no son necesarias para completar el objetivo, personajes complementarios con narrativas propias, objetos decorativos o de utilidad marginal, y rutas alternativas que permiten exploración lateral.
 
 Esta expansión se realiza respetando la coherencia lógica y espacial del mundo establecido en las etapas anteriores.
 
-Este quinto paso es opcional. Durante la etapa de testing interno, evitamos esta etapa del pipeline para garantizar que los mundos generados cumplieran exactamente con los parámetros de tamaño especificados en la configuración inicial. La inclusión de este paso puede resultar en mundos que excedan las cantidades configuradas, lo cual puede ser deseable para aumentar la riqueza del contenido, pero puede no ser adecuado cuando se requiere control preciso sobre las dimensiones del mundo (por ejemplo, en evaluaciones comparativas o estudios de rendimiento). La decisión de incluir o no ejecutar esta etapa debe tomarse en función de los objetivos específicos de cada caso de uso: mayor control y predictibilidad (sin expansión) versus mayor profundidad y contenido exploratorio (con expansión).
+Esta quinta etapa es opcional. Durante la etapa de testing interno, evitamos esta etapa del pipeline para garantizar que los mundos generados cumplieran exactamente con los parámetros de tamaño especificados en la configuración inicial. La inclusión de esta etapa puede resultar en mundos que excedan las cantidades configuradas, lo cual puede ser deseable para aumentar la riqueza del contenido, pero puede no ser adecuado cuando se requiere control preciso sobre las dimensiones del mundo (por ejemplo, en evaluaciones comparativas o estudios de rendimiento). La decisión de incluir o no ejecutar esta etapa debe tomarse en función de los objetivos específicos de cada caso de uso: mayor control y predictibilidad (sin expansión) versus mayor profundidad y contenido exploratorio (con expansión).
 
 \section{Sistema de Validación} \label{sec:validaciones}
 
@@ -482,12 +480,12 @@ El sistema de validación actúa como salvaguarda crítica entre las etapas del 
 Las validaciones se ejecutan en puntos específicos del pipeline, aprovechando que cada etapa tiene responsabilidades claramente delimitadas:
 
 \begin{itemize}
-    \item \textbf{Paso 2}: Validación de esquema más verificación de tamaños configurados
-    \item \textbf{Paso 3}: Validación de esquema más conectividad de ubicaciones (mediante búsqueda en profundidad) más completabilidad del objetivo
-    \item \textbf{Paso 4}: Validación de esquema más recompensas de puzles más re-validación de conectividad y completabilidad
+    \item \textbf{Etapa 2}: Validación de esquema más verificación de tamaños configurados
+    \item \textbf{Etapa 3}: Validación de esquema más conectividad de ubicaciones (mediante búsqueda en profundidad) más completabilidad del objetivo
+    \item \textbf{Etapa 4}: Validación de esquema más recompensas de puzles más re-validación de conectividad y completabilidad
 \end{itemize}
 
-Si cualquier validación falla, se descarta la generación y se reintenta el paso correspondiente. El sistema implementa un máximo de tres intentos por paso; tras agotarlos, el pipeline completo falla con una excepción descriptiva que indica qué validación específica no pudo ser satisfecha.
+Si cualquier validación falla, se descarta la generación y se reintenta la etapa correspondiente. El sistema implementa un máximo de tres intentos por etapa; tras agotarlos, el pipeline completo falla con una excepción descriptiva que indica qué validación específica no pudo ser satisfecha.
 
 \subsection{Tipos de Validación}
 
@@ -501,7 +499,7 @@ A diferencia de las validaciones anteriores que rechazan mundos inválidos, la v
 
 \subsection{Estrategias Diferenciadas: Corrección vs. Rechazo}
 
-El sistema aplica estrategias diferentes según el tipo de error detectado. Las recompensas faltantes en puzles se corrigen automáticamente, mientras que los objetivos imposibles causan rechazo y reintento del paso completo. Esta asimetría refleja diferencias en criticidad: los puzles son problemas localizados que pueden repararse sin comprometer la estructura general del mundo, mientras que los objetivos imposibles invalidan completamente la jugabilidad. Los detalles de implementación de estas estrategias se presentan en la Sección \ref{sec:orquestacion_pipeline} del Capítulo \ref{cap:implementacion}.
+El sistema aplica estrategias diferentes según el tipo de error detectado. Las recompensas faltantes en puzles se corrigen automáticamente, mientras que los objetivos imposibles causan rechazo y reintento completo de la etapa. Esta asimetría refleja diferencias en criticidad: los puzles son problemas localizados que pueden repararse sin comprometer la estructura general del mundo, mientras que los objetivos imposibles invalidan completamente la jugabilidad. Los detalles de implementación de estas estrategias se presentan en la Sección \ref{sec:orquestacion_pipeline} del Capítulo \ref{cap:implementacion}.
 
 Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el modelo es consistentemente inconsistente (generando repetidamente objetivos con objetos que no incluye en la lista de elementos del mundo), los tres reintentos fallarán y el pipeline completo fallará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzles. El modelo puede omitir un objeto importante del objetivo en \verb|world.items| aunque lo referencie en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
 
@@ -571,7 +569,7 @@ Los esquemas documentan explícitamente las restricciones de referencia mediante
 
 Estas validaciones post-parsing incluyen verificar conectividad bidireccional de ubicaciones, existencia de objetos referenciados en inventarios, y validez de las relaciones de dependencia. Las implementamos en funciones especializadas (descritas en la Sección \ref{sec:validaciones} del capítulo anterior) que rechazan mundos con referencias a objetos que no existen en el sistema orientado a objetos.
 
-Para soportar la generación en etapas implementamos modelos intermedios. \verb|WorldConcept| captura solamente el concepto inicial (título, historia de fondo, concepto del jugador, objetivo general), y \verb|WorldSkeleton| define las entidades clave mediante \verb|KeyEntity| (nombre más propósito) sin detalles completos. Esto permite que cada paso del pipeline genere y valide su salida antes de pasar al siguiente.
+Para soportar la generación en etapas implementamos modelos intermedios. \verb|WorldConcept| captura solamente el concepto inicial (título, historia de fondo, concepto del jugador, objetivo general), y \verb|WorldSkeleton| define las entidades clave mediante \verb|KeyEntity| (nombre más propósito) sin detalles completos. Esto permite que cada etapa del pipeline genere y valide su salida antes de pasar al siguiente.
 
 El módulo \verb|world_builder.py| traduce instancias de \verb|GeneratedWorld| a objetos del motor (\verb|World|, \verb|Location|, \verb|Item|, entre otros). Este proceso incluye resolución de nombres a referencias de objetos, establecimiento de conexiones bidireccionales y validación de la jugabilidad del mundo resultante. Como se mencionó en el Capítulo \ref{cap:diseno}, la separación entre modelos de generación (Pydantic) y la representación estructurada del motor (clases Python tradicionales, es decir, el estado simbólico) mantiene las responsabilidades claras. Mientras que Pydantic valida la estructura de la salida del modelo de lenguaje, el motor implementa la lógica de juego.
 
@@ -579,21 +577,21 @@ El módulo \verb|world_builder.py| traduce instancias de \verb|GeneratedWorld| a
 
 Ahora que el contexto de PAYADOR está definido mediante las estructuras de clases presentadas en el Capítulo \ref{cap:diseno}, y que hemos explicado cómo Pydantic valida la estructura de las salidas del modelo de lenguaje, podemos describir cómo se orquesta la ejecución del pipeline completo.
 
-La función \verb|create_world_incrementally()| coordina la ejecución secuencial de los cinco pasos del pipeline, manteniendo una única instancia del modelo de lenguaje y solicitando estructuras Pydantic específicas en cada etapa. Para cada paso del pipeline, es importante tener en cuenta cuál era su propósito según lo definido en la Sección \ref{sec:pipeline}:
+La función \verb|create_world_incrementally()| coordina la ejecución secuencial de las cinco etapas del pipeline, manteniendo una única instancia del modelo de lenguaje y solicitando estructuras Pydantic específicas en cada etapa. Para cada etapa del pipeline, es importante tener en cuenta cuál era su propósito según lo definido en la Sección \ref{sec:pipeline}:
 
 \begin{itemize}
-    \item \textbf{Paso 1} (Concepto del mundo): Genera título, backstory, concepto del jugador y objetivo
-    \item \textbf{Paso 2} (Esqueleto): Identifica entidades clave con cantidades configuradas
-    \item \textbf{Paso 3} (Mundo jugable): Materializa el esqueleto con detalles y conexiones
-    \item \textbf{Paso 4} (Desafíos): Introduce puzles y pasajes bloqueados
-    \item \textbf{Paso 5} (Expansión opcional): Enriquece con contenido adicional
+    \item \textbf{Etapa 1} (Concepto del mundo): Genera título, backstory, concepto del jugador y objetivo
+    \item \textbf{Etapa 2} (Esqueleto): Identifica entidades clave con cantidades configuradas
+    \item \textbf{Etapa 3} (Mundo jugable): Materializa el esqueleto con detalles y conexiones
+    \item \textbf{Etapa 4} (Desafíos): Introduce puzles y pasajes bloqueados
+    \item \textbf{Etapa 5} (Expansión opcional): Enriquece con contenido adicional
 \end{itemize}
 
-Implementamos un sistema de reintentos con un máximo de tres intentos por paso, ejecutando validaciones específicas según la etapa. Para el Paso 2, validamos el esquema Pydantic más la verificación de tamaños configurados. Para el Paso 3, validamos el esquema Pydantic más conectividad de ubicaciones mediante búsqueda en profundidad más completabilidad del objetivo. Para el Paso 4, validamos el esquema Pydantic más recompensas de puzles más re-validación de conectividad y completabilidad.
+Implementamos un sistema de reintentos con un máximo de tres intentos por etapa, ejecutando validaciones específicas según la etapa. Para la Etapa 2, validamos el esquema Pydantic más la verificación de tamaños configurados. Para la Etapa 3, validamos el esquema Pydantic más conectividad de ubicaciones mediante búsqueda en profundidad más completabilidad del objetivo. Para la Etapa 4, validamos el esquema Pydantic más recompensas de puzles más re-validación de conectividad y completabilidad.
 
-Si cualquier validación falla, se descarta la generación y se reintenta el paso. Escribimos fluidamente la lógica: el sistema registra el error específico, incrementa el contador de intentos y regenera desde el modelo de lenguaje. Tras tres intentos fallidos, el pipeline completo falla con excepción descriptiva.
+Si cualquier validación falla, se descarta la generación y se reintenta la etapa. Escribimos fluidamente la lógica: el sistema registra el error específico, incrementa el contador de intentos y regenera desde el modelo de lenguaje. Tras tres intentos fallidos, el pipeline completo falla con excepción descriptiva.
 
-Las recompensas faltantes en puzles se corrigen automáticamente dentro del intento actual mediante una función especializada, permitiendo recuperar mundos con omisiones menores. Por otro lado, los objetivos imposibles causan rechazo y reintento completo del paso. Esta asimetría refleja diferencias en criticidad: cuando un puzle presenta un error estructural, el sistema puede corregirlo localmente; en cambio, cuando un objetivo es imposible de completar, el mundo completo se vuelve injugable y debe regenerarse.
+Las recompensas faltantes en puzles se corrigen automáticamente dentro del intento actual mediante una función especializada, permitiendo recuperar mundos con omisiones menores. Por otro lado, los objetivos imposibles causan rechazo y reintento completo de la etapa. Esta asimetría refleja diferencias en criticidad: cuando un puzle presenta un error estructural, el sistema puede corregirlo localmente; en cambio, cuando un objetivo es imposible de completar, el mundo completo se vuelve injugable y debe regenerarse.
 
 Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el modelo es consistentemente inconsistente (generando repetidamente objetivos con objetos que no incluye en la lista de elementos del mundo), los tres reintentos fallarán y el pipeline fallará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzles (volveremos a esto más adelante, al detallar la clase Puzzle en el contexto de implementación). El modelo puede omitir un objeto importante del objetivo en \verb|world.items| aunque lo referencie en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
 
@@ -601,7 +599,7 @@ Como se discutirá en el Capítulo \ref{cap:evaluacion}, esta fragilidad result�
 
 Implementamos serialización completa del estado usando la biblioteca jsonpickle, guardando el mundo en el turno 0 con todas las referencias de objetos. Un \textbf{turno} representa una iteración completa del ciclo de juego: el par formado por la acción del jugador y la respuesta del sistema. El \textbf{turno 0} es especial porque representa el estado inicial del mundo antes de cualquier interacción del jugador, incluyendo la narración inicial que describe la escena de apertura. Este JSON permitió detectar inconsistencias que no eran inmediatamente visibles durante el juego (puzles existentes pero no presentados, recompensas mencionadas pero no estructuradas). Por ejemplo, identificamos casos donde un objeto faltaba en \verb|world.items| pese a estar en \verb|objective.components|, lo cual era invisible durante el juego pero inmediato al inspeccionar el JSON.
 
-Tras el Paso 4, se verifica tamaño del mundo, conectividad y completabilidad del objetivo. Si estas validaciones finales fallan, se emiten advertencias pero no se rechaza el mundo porque ya se alcanzó el límite de intentos. En la práctica, estas validaciones rara vez fallan si las validaciones intermedias fueron exitosas, ya que los problemas críticos habrán sido detectados y corregidos en etapas anteriores.
+Tras la Etapa 4, se verifica tamaño del mundo, conectividad y completabilidad del objetivo. Si estas validaciones finales fallan, se emiten advertencias pero no se rechaza el mundo porque ya se alcanzó el límite de intentos. En la práctica, estas validaciones rara vez fallan si las validaciones intermedias fueron exitosas, ya que los problemas críticos habrán sido detectados y corregidos en etapas anteriores.
 
 \section{Lógica de Juego y Ciclo de Interacción} \label{sec:logica_juego}
 
@@ -782,7 +780,7 @@ La interacción con modelos de lenguaje mediante prompts representa tanto el pun
 Creamos una biblioteca que carga prompts que escribimos, basándose en su función y la fase del pipeline. Organizamos los prompts en tres categorías principales:
 
 \begin{itemize}
-    \item \textbf{Generación incremental}: Usadas en el Paso 1 del pipeline (ver Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step1}), Paso 2 (Sección \ref{anexo:prompt_step2}), Paso 3 (Sección \ref{anexo:prompt_step3}), Paso 4 (Sección \ref{anexo:prompt_step4}), y opcionalmente Paso 5
+    \item \textbf{Generación incremental}: Usadas en la Etapa 1 del pipeline (ver Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step1}), Etapa 2 (Sección \ref{anexo:prompt_step2}), Etapa 3 (Sección \ref{anexo:prompt_step3}), Etapa 4 (Sección \ref{anexo:prompt_step4}), y opcionalmente Etapa 5
     \item \textbf{Juego}: Prompts para actualización estructurada del mundo (p. ej.: \verb|prompt_world_update_structured|) y narración de escenas (p. ej.: \verb|prompt_narrate_current_scene|)
     \item \textbf{Utilidad}: Prompts para generar descripciones alternativas (p. ej.: \verb|prompt_describe_objective|)
 \end{itemize}
@@ -810,7 +808,7 @@ Esta arquitectura facilita mantener coherencia entre idiomas aunque sería compl
 
 \subsection{Validación por Capas con Reintentos}
 
-Como mencionamos en la Sección sobre orquestación del pipeline, implementamos validación multicapa después de cada paso, con reintentos automáticos. Si cualquier validación falla (descritas en la Sección \ref{sec:validaciones} del Capítulo \ref{cap:diseno}), el LLM se vuelve a llamar. El sistema imprime el error específico, incrementa el contador de intentos y regenera desde el modelo. Configuramos un máximo de tres intentos por defecto, lanzando \verb|ValueError| si se agotan.
+Como mencionamos en la Sección sobre orquestación del pipeline, implementamos validación multicapa después de cada etapa, con reintentos automáticos. Si cualquier validación falla (descritas en la Sección \ref{sec:validaciones} del Capítulo \ref{cap:diseno}), el LLM se vuelve a llamar. El sistema imprime el error específico, incrementa el contador de intentos y regenera desde el modelo. Configuramos un máximo de tres intentos por defecto, lanzando \verb|ValueError| si se agotan.
 
 \subsection{Manejo de Errores de API}
 
@@ -843,7 +841,7 @@ El modo \texttt{inspiration} permite al usuario proporcionar una frase o temáti
 
 Agregamos sugerencias populares predefinidas como botones que, al ser seleccionados, completan automáticamente el campo de texto con descripciones más detalladas. Esta funcionalidad reduce la barrera de entrada para usuarios que no tienen clara una temática inicial.
 
-Cuando generamos el mundo desde un texto de inspiración (correspondiente al modo \texttt{inspiration} detallado en la Sección \ref{sec:modos_juego}), el sistema ejecuta los cuatro pasos del pipeline de forma secuencial con feedback visual. Cada paso muestra su mensaje de progreso (p. ej.: ``Paso 1: Generando concepto del mundo...''), actualiza una barra de progreso y muestra mensajes de confirmación con detalles. Este feedback permite informarle al usuario sobre el proceso que se está ejecutando, durante los 30-60 segundos que típicamente toma la generación completa.
+Cuando generamos el mundo desde un texto de inspiración (correspondiente al modo \texttt{inspiration} detallado en la Sección \ref{sec:modos_juego}), el sistema ejecuta las cuatro etapas del pipeline de forma secuencial con feedback visual. Cada etapa muestra su mensaje de progreso (p. ej.: ``Etapa 1: Generando concepto del mundo...''), actualiza una barra de progreso y muestra mensajes de confirmación con detalles. Este feedback permite informarle al usuario sobre el proceso que se está ejecutando, durante los 30-60 segundos que típicamente toma la generación completa.
 
 \subsubsection{Modo Generate}
 
