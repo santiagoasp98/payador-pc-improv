@@ -1,4 +1,4 @@
-\chapter{Diseño y Arquitectura del Sistema} \label{cap:diseno}
+﻿\chapter{Diseño y Arquitectura del Sistema} \label{cap:diseno}
 
 Este capítulo presenta el modelo conceptual del sistema de generación automática de mundos interactivos desarrollado como extensión de PAYADOR. El objetivo es explicar \textit{qué} componentes conforman el sistema y \textit{por qué} fueron diseñados de esta manera, sin enfocarnos aún en los detalles de implementación tecnológica que se abordarán en el Capítulo \ref{cap:implementacion}.
 
@@ -7,7 +7,7 @@ El desarrollo abordó un desafío complejo: permitir que modelos de lenguaje gen
 La arquitectura resultante integra tres pilares fundamentales que se describirán en las siguientes secciones:
 
 \begin{itemize}
-    \item \textbf{Estructura de Clases}: Define los elementos básicos del mundo: ubicaciones, objetos, personajes, puzzles y objetivos, y sus relaciones. Esta estructura actúa como el esqueleto sobre el cual se construye todo el contenido generado.
+    \item \textbf{Estructura de Clases}: Define los elementos básicos del mundo: ubicaciones, objetos, personajes, puzles y objetivos, y sus relaciones. Esta estructura actúa como el esqueleto sobre el cual se construye todo el contenido generado.
     \item \textbf{Pipeline de Generación Incremental}: Descompone la creación del mundo en cinco etapas secuenciales, cada una con responsabilidades específicas. Este enfoque surgió como solución a problemas críticos observados en aproximaciones de generación directa.
     \item \textbf{Sistema de Validación}: Verifica la coherencia estructural y la jugabilidad en cada etapa del pipeline, verificando que los mundos generados sean completables y libres de inconsistencias críticas.
 \end{itemize}
@@ -20,11 +20,11 @@ El sistema extiende PAYADOR modificándolo de un motor de juegos con mundos pred
 
 \subsection{Componentes Principales}
 
-El motor de generación basado en LLM constituye el núcleo del sistema y utiliza un pipeline incremental de cinco etapas que descompone la creación del mundo en tareas específicas. Este motor puede generar mundos con responsabilidad creativa total \cite{colton2012computational} o guiados por semillas (\textit{seeds}) proporcionadas por el usuario. Para garantizar que estos mundos sean estructuralmente válidos, desarrollamos un sistema de representación estructurada que define esquemas de datos con taxonomías completas tanto para objetivos como para puzzles, cada una con consideraciones específicas de implementación que se detallarán en las secciones \ref{subsec:clase_objective} y \ref{subsec:clase_puzzle}.
+El motor de generación basado en LLM constituye el núcleo del sistema y utiliza un pipeline incremental de cinco etapas que descompone la creación del mundo en tareas específicas. Este motor puede generar mundos con responsabilidad creativa total \cite{colton2012computational} o guiados por semillas (\textit{seeds}) proporcionadas por el usuario. Para garantizar que estos mundos sean estructuralmente válidos, desarrollamos un sistema de representación estructurada que define esquemas de datos con taxonomías completas tanto para objetivos como para puzles, cada una con consideraciones específicas de implementación que se detallarán en las secciones \ref{subsec:clase_objective} y \ref{subsec:clase_puzzle}.
 
 El sistema ofrece cinco modos de juego diferenciados con distintos niveles de control sobre la generación: \textit{Generate} (generación autónoma total), \textit{Inspiration} (guiado por tema del usuario), \textit{Preset} (mundos preconstruidos), \textit{Tutorial} (mundo didáctico) y \textit{Replay} (recuperación de partidas guardadas). La descripción detallada de estos modos se presenta en la Sección \ref{sec:modos_juego}.
 
-Para mejorar la experiencia del jugador, incorporamos un sistema de asistencia adaptativo que implementa un mecanismo dinámico de pistas (\textit{hints}) ajustado a la situación inmediata. Cuando el jugador está en una ubicación sin puzzles, el sistema ofrece pistas relacionadas con el objetivo principal. Si hay un puzzle en la ubicación pero no ha sido presentado, las pistas sugieren explorar e interactuar con elementos del entorno. Una vez que el puzzle ha sido propuesto y el jugador no lo ha resuelto, las pistas cambian automáticamente a las específicas de ese puzzle, proporcionando ayuda progresiva. Este mecanismo fue crucial para mejorar la experiencia de usuario sin comprometer el desafío, como se describe en la Sección \ref{sec:sistema_hints}.
+Para mejorar la experiencia del jugador, incorporamos un sistema de asistencia adaptativo que implementa un mecanismo dinámico de pistas (\textit{hints}) ajustado a la situación inmediata. Cuando el jugador está en una ubicación sin puzles, el sistema ofrece pistas relacionadas con el objetivo principal. Si hay un puzle en la ubicación pero no ha sido presentado, las pistas sugieren explorar e interactuar con elementos del entorno. Una vez que el puzle ha sido propuesto y el jugador no lo ha resuelto, las pistas cambian automáticamente a las específicas de ese puzle, proporcionando ayuda progresiva. Este mecanismo fue crucial para mejorar la experiencia de usuario sin comprometer el desafío, como se describe en la Sección \ref{sec:sistema_hints}.
 
 La persistencia de datos se resolvió mediante integración con MongoDB, lo cual proporcionó capacidades de reproducibilidad fundamentales tanto para el modo \textit{Replay} como para el proceso de depuración durante el desarrollo. La capacidad de recuperar mundos exactos junto con un estado específico del juego (cargando tanto el mundo como el historial de turnos) aceleró significativamente la identificación y corrección de errores en el pipeline de generación.
 
@@ -45,24 +45,24 @@ La Figura \ref{fig:flujo_general} muestra el flujo general del sistema, ilustran
 
 Antes de describir cómo se genera el contenido del mundo mediante el pipeline incremental, es fundamental entender qué elementos lo componen y cómo se relacionan entre sí. Esta sección presenta la arquitectura de clases que define la estructura de los mundos interactivos en el sistema.
 
-Durante las etapas tempranas del desarrollo, nos enfrentamos a un problema crítico: los primeros intentos de generación produjeron mundos donde los elementos estaban desconectados. Teníamos puzzles que no contribuían al progreso, ubicaciones sin propósito narrativo y personajes aislados de la trama principal. Esta desconexión hacía extremadamente difícil probar el sistema y resultaba en experiencias de juego frustrantes e incoherentes.
+Durante las etapas tempranas del desarrollo, nos enfrentamos a un problema crítico: los primeros intentos de generación produjeron mundos donde los elementos estaban desconectados. Teníamos puzles que no contribuían al progreso, ubicaciones sin propósito narrativo y personajes aislados de la trama principal. Esta desconexión hacía extremadamente difícil probar el sistema y resultaba en experiencias de juego frustrantes e incoherentes.
 
 Este problema motivó replantear fundamentalmente la arquitectura del mundo. La idea central que surgió fue que \textbf{todo debe estar lógica y semánticamente conectado en torno al objetivo y la narrativa}. No buscábamos mundos que fueran simplemente colecciones de elementos temáticamente coherentes; necesitábamos mundos donde cada elemento tuviera un propósito funcional claro en la progresión hacia el objetivo.
 
-Para implementar esta visión, diseñamos una estructura con \textbf{conexiones y referencias explícitas} entre todos sus componentes. Esto implicó cambios significativos respecto a PAYADOR original: antes, las relaciones entre elementos eran implícitas (por ejemplo, una ubicación podía listar ítems por nombre sin validación de que existieran), y las condiciones para avanzar estaban codificadas en la lógica del motor, no en la definición del mundo.
+Para implementar esta visión, diseñamos una estructura con \textbf{conexiones y referencias explícitas} entre todos sus componentes. Esto implicó cambios significativos respecto a PAYADOR original: antes, las relaciones entre elementos eran implícitas (por ejemplo, una ubicación podía listar objetos por nombre sin validación de que existieran), y las condiciones para avanzar estaban codificadas en la lógica del motor, no en la definición del mundo.
 
 La nueva arquitectura modela explícitamente:
 \begin{itemize}
-    \item \textbf{Personajes con propósito}: Cada personaje relevante para la narrativa tiene algo útil para el jugador (p. ej.: información, objetos) y establece condiciones claras para obtenerlo (p. ej.: resolver un puzzle, entregar un ítem).
-    \item \textbf{Puzzles con consecuencias}: Su resolución produce efectos tangibles modelados directamente en su definición: entregar ítems específicos, desbloquear pasajes concretos, o revelar información necesaria para el objetivo.
-    \item \textbf{Ítems funcionales}: Los objetos tienen roles definidos en la progresión narrativa, ya sea como requisitos para puzzles, moneda de intercambio con personajes, o componentes directos del objetivo.
+    \item \textbf{Personajes con propósito}: Cada personaje relevante para la narrativa tiene algo útil para el jugador (p. ej.: información, objetos) y establece condiciones claras para obtenerlo (p. ej.: resolver un puzle, entregar un objeto).
+    \item \textbf{puzles con consecuencias}: Su resolución produce efectos tangibles modelados directamente en su definición: entregar objetos específicos, desbloquear pasajes concretos, o revelar información necesaria para el objetivo.
+    \item \textbf{objetos funcionales}: Los objetos tienen roles definidos en la progresión narrativa, ya sea como requisitos para puzles, moneda de intercambio con personajes, o componentes directos del objetivo.
     \item \textbf{Ubicaciones con significado}: Contienen elementos críticos para el avance o sirven como puntos de conexión en la red de dependencias del mundo.
 \end{itemize}
 
 Este diseño orientado al objetivo (\textit{goal-oriented}) ofrece ventajas cruciales:
 \begin{itemize}
     \item \textbf{Guía para la generación}: El modelo de lenguaje recibe una estructura clara que define qué elementos debe crear y cómo deben relacionarse, reduciendo la ambigüedad.
-    \item \textbf{Validación automática}: Las referencias cruzadas explícitas permiten verificar estructuralmente la coherencia. Si un puzzle referencia un objeto como recompensa, ese objeto debe existir y estar ubicado correctamente.
+    \item \textbf{Validación automática}: Las referencias cruzadas explícitas permiten verificar estructuralmente la coherencia. Si un puzle referencia un objeto como recompensa, ese objeto debe existir y estar ubicado correctamente.
     \item \textbf{Mejora de jugabilidad}: Al forzar conexiones explícitas con el objetivo, minimizamos la generación de contenido irrelevante o puramente decorativo.
 \end{itemize}
 
@@ -85,8 +85,8 @@ La clase \verb|World| constituye el contenedor principal de todos los elementos 
     \item \textbf{Objetivo principal}: Instancia de \verb|Objective| que define la meta del mundo
     \item \textbf{Ubicaciones}: Lista de \verb|Location| con sus conexiones bidireccionales
     \item \textbf{Personajes}: Lista de \verb|Character| con sus inventarios y condiciones de interacción
-    \item \textbf{Ítems}: Catálogo global de \verb|Item| con sus propiedades y ubicaciones
-    \item \textbf{Puzzles}: Conjunto de \verb|Puzzle| con sus recompensas y requisitos
+    \item \textbf{objetos}: Catálogo global de \verb|Item| con sus propiedades y ubicaciones
+    \item \textbf{puzles}: Conjunto de \verb|Puzzle| con sus recompensas y requisitos
     \item \textbf{Estado inicial}: Ubicación de inicio y configuración inicial del jugador
 \end{itemize}
 
@@ -99,7 +99,7 @@ La clase \verb|Location| representa los espacios físicos del mundo donde transc
 \begin{itemize}
     \item \textbf{items}: Lista de objetos presentes en la ubicación
     \item \textbf{connecting\_locations}: Lista de ubicaciones directamente accesibles
-    \item \textbf{blocked\_locations}: Diccionario de pasajes bloqueados por obstáculos (ítems o puzzles)
+    \item \textbf{blocked\_locations}: Diccionario de pasajes bloqueados por obstáculos (objetos o puzles)
     \item \textbf{visited}: Indicador de si el jugador ha visitado previamente la ubicación. Este atributo se envía al modelo de lenguaje como parte del contexto del mundo, permitiendo que adapte la narrativa: ubicaciones visitadas por primera vez reciben descripciones más elaboradas y detalladas, mientras que ubicaciones ya conocidas generan narraciones más breves y enfocadas en cambios relevantes.
 \end{itemize}
 
@@ -122,21 +122,21 @@ El único atributo específico de \verb|Item| es \verb|gettable| (booleano), que
 En el Paso 3 del pipeline, establecimos reglas explícitas sobre el uso de \verb|gettable|:
 \begin{itemize}
     \item Todo objeto necesario para completar el objetivo principal debe ser \verb|gettable=True|, garantizando que el jugador pueda obtenerlo.
-    \item Los objetos que bloquean pasajes pueden ser \verb|gettable=True| (se desbloquea al tomarlos) o \verb|gettable=False| (requieren otra solución, como un puzzle).
+    \item Los objetos que bloquean pasajes pueden ser \verb|gettable=True| (se desbloquea al tomarlos) o \verb|gettable=False| (requieren otra solución, como un puzle).
     \item Cada objeto debe tener una justificación clara dentro del mundo: funcional (parte de la progresión) o atmosférica (ambientación).
 \end{itemize}
 
-Esta distinción permite al modelo de lenguaje crear mundos donde no todos los objetos mencionados en las descripciones necesitan ser manipulables, evitando inconsistencias donde elementos puramente narrativos pudieran confundirse con ítems funcionales del gameplay.
+Esta distinción permite al modelo de lenguaje crear mundos donde no todos los objetos mencionados en las descripciones necesitan ser manipulables, evitando inconsistencias donde elementos puramente narrativos pudieran confundirse con objetos funcionales del juego.
 
-Durante el desarrollo enfrentamos un problema crítico relacionado con el manejo de referencias únicas versus duplicación de objetos. Cuando el jugador intentaba tomar un ítem, particularmente aquellos otorgados como recompensa de puzzles, el sistema duplicaba el objeto en lugar de mover la referencia existente. La causa raíz era que el modelo de lenguaje frecuentemente no creaba los ítems de recompensa especificados en los puzzles, y nuestra solución inicial fue crear el ítem automáticamente si no existía. Sin embargo, esto causaba duplicación cuando el ítem sí existía pero la lógica de búsqueda fallaba en encontrarlo en los contenedores esperados (como en inventarios de personajes o ubicaciones).
+Durante el desarrollo enfrentamos un problema crítico relacionado con el manejo de referencias únicas versus duplicación de objetos. Cuando el jugador intentaba tomar un objeto, particularmente aquellos otorgados como recompensa de puzles, el sistema duplicaba el objeto en lugar de mover la referencia existente. La causa raíz era que el modelo de lenguaje frecuentemente no creaba los objetos de recompensa especificados en los puzles, y nuestra solución inicial fue crear el objeto automáticamente si no existía. Sin embargo, esto causaba duplicación cuando el objeto sí existía pero la lógica de búsqueda fallaba en encontrarlo en los contenedores esperados (como en inventarios de personajes o ubicaciones).
 
 La solución definitiva fue dual:
 \begin{itemize}
-    \item \textbf{Prevención en generación}: Implementamos una validación exhaustiva de recompensas de puzzles (que se detallará más adelante en la Subsección \ref{subsec:clase_puzzle}) que verifica y crea los ítems faltantes durante la generación del mundo, no durante el gameplay.
-    \item \textbf{Corrección en transferencia}: Refactorizamos la lógica de transferencia de ítems para buscar la referencia exacta del objeto en todos los contenedores posibles, moviendo la referencia en lugar de crear copias, y reportando errores explícitos si el objeto no se encuentra en ningún contenedor.
+    \item \textbf{Prevención en generación}: Implementamos una validación exhaustiva de recompensas de puzles (que se detallará más adelante en la Subsección \ref{subsec:clase_puzzle}) que verifica y crea los objetos faltantes durante la generación del mundo, no durante el juego.
+    \item \textbf{Corrección en transferencia}: Refactorizamos la lógica de transferencia de objetos para buscar la referencia exacta del objeto en todos los contenedores posibles, moviendo la referencia en lugar de crear copias, y reportando errores explícitos si el objeto no se encuentra en ningún contenedor.
 \end{itemize}
 
-Este error evidenció la importancia de mantener referencias únicas a los objetos del mundo y validar exhaustivamente su ubicación antes de cualquier operación de transferencia. La complejidad surge porque los ítems pueden existir en múltiples contextos: como elementos libres en ubicaciones, en inventarios de personajes, o actuando como obstáculos que bloquean pasajes.
+Este error evidenció la importancia de mantener referencias únicas a los objetos del mundo y validar exhaustivamente su ubicación antes de cualquier operación de transferencia. La complejidad surge porque los objetos pueden existir en múltiples contextos: como elementos libres en ubicaciones, en inventarios de personajes, o actuando como obstáculos que bloquean pasajes.
 
 Sin embargo, como se discutirá en detalle en el Capítulo \ref{cap:evaluacion}, este problema reaparece en casos límite específicos: cuando el modelo de lenguaje intenta mover un objeto al inventario del jugador pero la búsqueda de su ubicación actual falla (debido a problemas de comparación de identidad de objetos), el sistema interpreta incorrectamente la operación, añadiendo el objeto a la ubicación actual sin removerlo de su posición original, resultando en duplicación. Este comportamiento revela la fragilidad de la lógica de control de flujo cuando se combina con la búsqueda flexible de objetos y las múltiples ramificaciones condicionales del sistema de actualización del mundo.
 
@@ -145,30 +145,30 @@ Sin embargo, como se discutirá en detalle en el Capítulo \ref{cap:evaluacion},
 La clase \verb|Character| representa tanto al jugador como a los personajes no jugadores (NPCs) del mundo. Al igual que las clases anteriores, hereda de \verb|Component| y se mantuvo estructuralmente similar a la implementación de PAYADOR, con ajustes menores para soportar las necesidades del sistema de generación. Los atributos principales son:
 
 \begin{itemize}
-    \item \textbf{inventory}: Lista de ítems que posee el personaje
+    \item \textbf{inventory}: Lista de objetos que posee el personaje
     \item \textbf{location}: Referencia a la ubicación actual donde se encuentra
     \item \textbf{visited\_locations}: Diccionario que registra las ubicaciones visitadas y sus descripciones sucesivas
-    \item \textbf{interaction}: Datos estructurados de interacción provenientes del proceso de generación, que incluyen información sobre puzzles propuestos y condiciones de intercambio
+    \item \textbf{interaction}: Datos estructurados de interacción provenientes del proceso de generación, que incluyen información sobre puzles propuestos y condiciones de intercambio
 \end{itemize}
 
 Durante el Paso 3 del pipeline, establecimos reglas para garantizar que los NPCs generados sean funcionalmente coherentes:
 \begin{itemize}
-    \item Si un personaje tiene capacidad de interacción, debe contar con texto de interacción definido. Este texto se utiliza cuando el sistema presenta automáticamente un puzzle asociado al personaje, garantizando una transición narrativa fluida entre la exploración y el desafío.
+    \item Si un personaje tiene capacidad de interacción, debe contar con texto de interacción definido. Este texto se utiliza cuando el sistema presenta automáticamente un puzle asociado al personaje, garantizando una transición narrativa fluida entre la exploración y el desafío.
     \item Todo objeto en el inventario de un personaje debe existir en la lista global de objetos del mundo, evitando referencias inexistentes.
     \item Los personajes deben estar asignados a una ubicación válida del mundo, resolviendo el problema de NPCs sin ubicación asignada que observamos en experimentos preliminares de generación directa.
 \end{itemize}
 
-Estas validaciones aseguran que los NPCs no solo sean temáticamente apropiados sino también funcionalmente integrados en la mecánica del juego, permitiendo intercambios de ítems, proposición de puzzles y progresión narrativa coherente.
+Estas validaciones aseguran que los NPCs no solo sean temáticamente apropiados sino también funcionalmente integrados en la mecánica del juego, permitiendo intercambios de objetos, proposición de puzles y progresión narrativa coherente.
 
 \subsection{Clase Puzzle} \label{subsec:clase_puzzle}
 
 La clase \verb|Puzzle| representa los desafíos que obstaculizan el progreso del jugador hacia el objetivo. A diferencia de las clases anteriores, \verb|Puzzle| experimentó modificaciones y extensiones significativas respecto a la implementación base de PAYADOR, impulsadas por los problemas observados durante nuestras pruebas internas y las necesidades del sistema de generación automática.
 
-Uno de los primeros cambios que implementamos fue la introducción de tipos explícitos de puzzles. Sin esta categorización, el modelo de lenguaje quedaba sin guía clara al momento de crear desafíos, generando puzzles inconsistentes o mal estructurados. Definimos siete tipos de puzzles que el sistema puede generar. La Tabla \ref{tab:tipos_puzzles} presenta cada tipo con su descripción y un ejemplo representativo.
+Uno de los primeros cambios que implementamos fue la introducción de tipos explícitos de puzles. Sin esta categorización, el modelo de lenguaje quedaba sin guía clara al momento de crear desafíos, generando puzles inconsistentes o mal estructurados. Definimos siete tipos de puzles que el sistema puede generar. La Tabla \ref{tab:tipos_puzzles} presenta cada tipo con su descripción y un ejemplo representativo.
 
 \begin{table}[h]
 \centering
-\caption{Tipología de puzzles implementada en el sistema}
+\caption{Tipología de puzles implementada en el sistema}
 \label{tab:tipos_puzzles}
 \begin{tabular}{|p{2.5cm}|p{5cm}|p{6cm}|}
 \hline
@@ -178,7 +178,7 @@ Riddle & Adivinanzas que requieren razonamiento lateral o conocimiento general &
 \hline
 Logic & Problemas lógicos que requieren deducción o razonamiento estructurado & ``Si todos los zorgos son plinks, y algunos plinks son truks, ¿pueden algunos zorgos ser truks?'' \\
 \hline
-Wordplay & Juegos de palabras, anagramas, o puzzles lingüísticos & ``Reorganiza las letras de ALERO para encontrar el nombre del metal.'' (Respuesta: OREAL → ORO) \\
+Wordplay & Juegos de palabras, anagramas, o puzles lingüísticos & ``Reorganiza las letras de ALERO para encontrar el nombre del metal.'' (Respuesta: OREAL → ORO) \\
 \hline
 Observation & Observar detalles del entorno para encontrar la solución & ``Cuenta las velas encendidas en el candelabro del salón.'' \\
 \hline
@@ -191,52 +191,52 @@ Memory & Recordar información presentada previamente en la narrativa & ``¿Cuá
 \end{tabular}
 \end{table}
 
-Inicialmente habíamos incluido un tipo adicional llamado \textit{Information}, donde resolver el puzzle otorgaba información relevante para el objetivo. Sin embargo, en experimentos preliminares observamos que este tipo resultaba problemático: los puzzles frecuentemente no se presentaban correctamente o, cuando se resolvían, entregaban información irrelevante u obvia, lo que podía confundir o frustrar al jugador. Dado que el sistema está diseñado con un enfoque \textit{goal-oriented}, todos los tipos de puzzles terminan derivando en obtener una recompensa tangible (por ejemplo, un objeto) o completar un objetivo. Por esta razón, decidimos eliminar el tipo \textit{Information} y mantener solo aquellos donde la recompensa es funcionalmente clara.
+Inicialmente habíamos incluido un tipo adicional llamado \textit{Information}, donde resolver el puzle otorgaba información relevante para el objetivo. Sin embargo, en experimentos preliminares observamos que este tipo resultaba problemático: los puzles frecuentemente no se presentaban correctamente o, cuando se resolvían, entregaban información irrelevante u obvia, lo que podía confundir o frustrar al jugador. Dado que el sistema está diseñado con un enfoque \textit{goal-oriented}, todos los tipos de puzles terminan derivando en obtener una recompensa tangible (por ejemplo, un objeto) o completar un objetivo. Por esta razón, decidimos eliminar el tipo \textit{Information} y mantener solo aquellos donde la recompensa es funcionalmente clara.
 
-La estructura de un puzzle incluye los siguientes elementos:
+La estructura de un puzle incluye los siguientes elementos:
 
 \begin{itemize}
-    \item \textbf{problem}: El enunciado del desafío que debe resolver el jugador (p.~ej.: ``¿Qué tiene ojos pero no puede ver?'')
+    \item \textbf{problem}: El enunciado del desafío que debe resolver el jugador (p. ej.: ``¿Qué tiene ojos pero no puede ver?'')
     \item \textbf{answer}: La respuesta esperada, oculta al jugador
     \item \textbf{puzzle\_type}: Categorización según la tipología presentada en la Tabla \ref{tab:tipos_puzzles}
-    \item \textbf{proposed\_by\_character}: Nombre del personaje que propone el puzzle, o \verb|None| si es de descubrimiento ambiental
-    \item \textbf{proposed\_by\_location}: Nombre de la ubicación cuya investigación revela el puzzle (para puzzles ambientales), \verb|None| si es propuesto por un personaje
-    \item \textbf{rewards}: Recompensa obtenida al resolver el puzzle (p.~ej.: ítems específicos, pasajes desbloqueados)
-    \item \textbf{relevance\_to\_objective}: Explicación de cómo resolver este puzzle contribuye a alcanzar el objetivo principal del mundo. Este campo ayuda al jugador a entender por qué vale la pena resolver el desafío
-    \item \textbf{puzzle\_hints}: Lista de pistas progresivas para ayudar al jugador. Las pistas siempre son tres y se entregan en orden de más general a más específica
-    \item \textbf{interaction\_hint}: Sugerencia breve sobre cómo iniciar la interacción con el puzzle (p.~ej.: ``Intenta hablar con el guardián'' o ``Examina la inscripción en la pared''). Esta pista se diferencia de las \verb|puzzle_hints| en que se muestra cuando el puzzle existe pero aún no ha sido presentado al jugador, guiándolo a descubrirlo
+    \item \textbf{proposed\_by\_character}: Nombre del personaje que propone el puzle, o \verb|None| si es de descubrimiento ambiental
+    \item \textbf{proposed\_by\_location}: Nombre de la ubicación cuya investigación revela el puzle (para puzles ambientales), \verb|None| si es propuesto por un personaje
+    \item \textbf{rewards}: Recompensa obtenida al resolver el puzle (p. ej.: objetos específicos, pasajes desbloqueados)
+    \item \textbf{relevance\_to\_objective}: Explicación de cómo resolver este puzle contribuye a alcanzar el objetivo principal del mundo. Este campo ayuda al jugador a entender por qué vale la pena resolver el desafío
+    \item \textbf{puzle\_hints}: Lista de pistas progresivas para ayudar al jugador. Las pistas siempre son tres y se entregan en orden de más general a más específica
+    \item \textbf{interaction\_hint}: Sugerencia breve sobre cómo iniciar la interacción con el puzle (p. ej.: ``Intenta hablar con el guardián'' o ``Examina la inscripción en la pared''). Esta pista se diferencia de las \verb|puzzle_hints| en que se muestra cuando el puzle existe pero aún no ha sido presentado al jugador, guiándolo a descubrirlo
 \end{itemize}
 
-Durante el desarrollo identificamos seis problemas principales relacionados con los puzzles que requirieron soluciones específicas. Estos problemas ilustran las complejidades de delegar la generación de contenido funcional a modelos de lenguaje.
+Durante el desarrollo identificamos seis problemas principales relacionados con los puzles que requirieron soluciones específicas. Estos problemas ilustran las complejidades de delegar la generación de contenido funcional a modelos de lenguaje.
 
-\textbf{Problema 1: Puzzles invisibles.} Uno de los problemas más persistentes fue que el modelo de lenguaje creaba puzzles que nunca eran presentados al jugador durante la partida. Inicialmente intentamos resolver esto mediante instrucciones en el prompt, agregando los atributos \verb|interaction_hint| y especificando si el puzzle era \verb|proposed_by_character| o \verb|proposed_by_location| para que el modelo supiera cuándo narrarlo. Sin embargo, observamos que en la salida del modelo frecuentemente se omitía la presentación del puzzle: aunque el jugador hablara con el personaje que tenía un puzzle asociado, la narración generada no lo mencionaba.
+\textbf{Problema 1: Puzles invisibles.} Uno de los problemas más persistentes fue que el modelo de lenguaje creaba puzles que nunca eran presentados al jugador durante la partida. Inicialmente intentamos resolver esto mediante instrucciones en el prompt, agregando los atributos \verb|interaction_hint| y especificando si el puzle era \verb|proposed_by_character| o \verb|proposed_by_location| para que el modelo supiera cuándo narrarlo. Sin embargo, observamos que en la salida del modelo frecuentemente se omitía la presentación del puzle: aunque el jugador hablara con el personaje que tenía un puzle asociado, la narración generada no lo mencionaba.
 
-Ante esta situación, decidimos que no podíamos confiar en el modelo para esta tarea crítica que afecta directamente la jugabilidad. Implementamos una \textbf{intervención directa del sistema}: si la entrada del usuario menciona a un personaje que tiene un puzzle asociado, el sistema no solicita narración al modelo de lenguaje; en su lugar, narra automáticamente la proposición del puzzle utilizando el \verb|interaction_text| generado previamente durante la creación del mundo. Esta intervención busca garantizar que los puzzles sean efectivamente presentados al jugador. Adicionalmente, marcamos el puzzle como presentado mediante un atributo \verb|given: True|, de forma que el sistema no lo ingrese al prompt del modelo de lenguaje en potenciales futuras interacciones del jugador con el mismo personaje.
+Ante esta situación, decidimos que no podíamos confiar en el modelo para esta tarea crítica que afecta directamente la jugabilidad. Implementamos una \textbf{intervención directa del sistema}: si la entrada del usuario menciona a un personaje que tiene un puzle asociado, el sistema no solicita narración al modelo de lenguaje; en su lugar, narra automáticamente la proposición del puzle utilizando el \verb|interaction_text| generado previamente durante la creación del mundo. Esta intervención busca garantizar que los puzles sean efectivamente presentados al jugador. Adicionalmente, marcamos el puzle como presentado mediante un atributo \verb|given: True|, de forma que el sistema no lo ingrese al prompt del modelo de lenguaje en potenciales futuras interacciones del jugador con el mismo personaje.
 
-\textbf{Problema 2: Puzzles inventados durante el juego.} Otro problema recurrente fue que el modelo a veces generaba puzzles que no existían en la estructura del mundo. Si el jugador hablaba con un NPC y le solicitaba algo que el personaje tenía en su inventario, ocasionalmente el modelo narraba ``resuelve este puzzle y te lo daré'' aunque el NPC no tuviera ningún puzzle asociado estructuralmente. Este problema era particularmente complejo de detectar porque no era inmediatamente visible durante el juego; solo al inspeccionar la representación simbólica del mundo (los archivos JSON) podíamos identificar que el jugador estaba intentando resolver un puzzle que no existía en la estructura.
+\textbf{Problema 2: Puzles inventados durante el juego.} Otro problema recurrente fue que el modelo a veces generaba puzles que no existían en la estructura del mundo. Si el jugador hablaba con un NPC y le solicitaba algo que el personaje tenía en su inventario, ocasionalmente el modelo narraba ``resuelve este puzle y te lo daré'' aunque el NPC no tuviera ningún puzle asociado estructuralmente. Este problema era particularmente complejo de detectar porque no era inmediatamente visible durante el juego; solo al inspeccionar la representación simbólica del mundo (los archivos JSON) podíamos identificar que el jugador estaba intentando resolver un puzle que no existía en la estructura.
 
-La solución requirió ser más explícitos en el prompt de narración. En el contexto de este documento, utilizamos el término ``alucinación'' cuando el modelo de lenguaje no respeta el estado del mundo representado simbólicamente, generando contenido inconsistente con la estructura definida. Especificamos en las instrucciones que si no hay un puzzle presente en la estructura del mundo, el modelo no debe inventar puzzles. Las validaciones estructurales del mundo fueron fundamentales para detectar este tipo de inconsistencias durante el desarrollo.
+La solución requirió ser más explícitos en el prompt de narración. En el contexto de este documento, utilizamos el término ``alucinación'' cuando el modelo de lenguaje no respeta el estado del mundo representado simbólicamente, generando contenido inconsistente con la estructura definida. Especificamos en las instrucciones que si no hay un puzle presente en la estructura del mundo, el modelo no debe inventar puzles. Las validaciones estructurales del mundo fueron fundamentales para detectar este tipo de inconsistencias durante el desarrollo.
 
-\textbf{Problema 3: Puzzles excesivamente difíciles.} En nuestras pruebas internas observamos puzzles tan complejos que resultaban imposibles de resolver sin ayuda externa. En múltiples ocasiones tuvimos que consultar directamente la respuesta en la representación simbólica del mundo, ya que podíamos invertir varios minutos intentando razonar el puzzle sin acercarnos a la solución.
+\textbf{Problema 3: Puzles excesivamente difíciles.} En nuestras pruebas internas observamos puzles tan complejos que resultaban imposibles de resolver sin ayuda externa. En múltiples ocasiones tuvimos que consultar directamente la respuesta en la representación simbólica del mundo, ya que podíamos invertir varios minutos intentando razonar el puzle sin acercarnos a la solución.
 
-Este problema motivó la implementación del \textbf{sistema de pistas progresivas} mediante el atributo \verb|puzzle_hints|. Las pistas están ordenadas en cantidad ascendente de información: la primera puede orientar al jugador hacia la dirección correcta, la segunda proporciona más detalles, y la tercera prácticamente revela la respuesta, reconociendo que el jugador está significativamente atascado. Como se mencionará en la descripción del pipeline (Sección \ref{sec:pipeline}), esta idea resultó tan efectiva que posteriormente la expandimos a pistas para objetivos y pistas de exploración general. Como presentaremos en el Capítulo \ref{cap:evaluacion}, las evaluaciones con usuarios confirmaron la utilidad de este sistema: muchos participantes solicitaron las tres pistas para varios puzzles, indicando que se habrían atascado de no existir este mecanismo.
+Este problema motivó la implementación del \textbf{sistema de pistas progresivas} mediante el atributo \verb|puzzle_hints|. Las pistas están ordenadas en cantidad ascendente de información: la primera puede orientar al jugador hacia la dirección correcta, la segunda proporciona más detalles, y la tercera prácticamente revela la respuesta, reconociendo que el jugador está significativamente atascado. Como se mencionará en la descripción del pipeline (Sección \ref{sec:pipeline}), esta idea resultó tan efectiva que posteriormente la expandimos a pistas para objetivos y pistas de exploración general. Como presentaremos en el Capítulo \ref{cap:evaluacion}, las evaluaciones con usuarios confirmaron la utilidad de este sistema: muchos participantes solicitaron las tres pistas para varios puzles, indicando que se habrían atascado de no existir este mecanismo.
 
-\textbf{Problema 4: Recompensas no entregadas.} Cuando un puzzle era propuesto por un NPC y su recompensa era un ítem en el inventario del personaje, observamos que el NPC no entregaba el objeto tras resolver el puzzle correctamente. El problema radicaba en que el modelo de lenguaje no incluía en su salida la transformación necesaria (\verb|moved_object|) del inventario del NPC al jugador.
+\textbf{Problema 4: Recompensas no entregadas.} Cuando un puzle era propuesto por un NPC y su recompensa era un objeto en el inventario del personaje, observamos que el NPC no entregaba el objeto tras resolver el puzle correctamente. El problema radicaba en que el modelo de lenguaje no incluía en su salida la transformación necesaria (\verb|moved_object|) del inventario del NPC al jugador.
 
-La solución nuevamente requirió intervención del sistema simbólico: cuando el jugador resuelve un puzzle, se ejecuta una función que verifica las recompensas estructuradas, busca el ítem correspondiente y lo mueve automáticamente al inventario del jugador, sin depender de que el modelo genere esta acción en su narración.
+La solución nuevamente requirió intervención del sistema simbólico: cuando el jugador resuelve un puzle, se ejecuta una función que verifica las recompensas estructuradas, busca el objeto correspondiente y lo mueve automáticamente al inventario del jugador, sin depender de que el modelo genere esta acción en su narración.
 
-\textbf{Problema 5: Recompensas inexistentes.} En varios mundos generados identificamos que las recompensas de puzzles (especificadas como \verb|ItemReward| en la estructura) no existían en el conjunto de objetos del mundo. Cuando el jugador resolvía el puzzle, no ocurría nada porque no había ítem que mover. Este problema se detectó durante validaciones post-generación y lo abordamos mediante una función de verificación que:
+\textbf{Problema 5: Recompensas inexistentes.} En varios mundos generados identificamos que las recompensas de puzles (especificadas como \verb|ItemReward| en la estructura) no existían en el conjunto de objetos del mundo. Cuando el jugador resolvía el puzle, no ocurría nada porque no había objeto que mover. Este problema se detectó durante validaciones post-generación y lo abordamos mediante una función de verificación que:
 
 \begin{itemize}
-    \item Verifica que todos los ítems de recompensa existan en \verb|world.items|
-    \item Si un ítem de recompensa no existe, lo crea automáticamente
-    \item Asigna el ítem creado al inventario del personaje que propone el puzzle, o a la ubicación del puzzle si es ambiental
+    \item Verifica que todos los objetos de recompensa existan en \verb|world.items|
+    \item Si un objeto de recompensa no existe, lo crea automáticamente
+    \item Asigna el objeto creado al inventario del personaje que propone el puzle, o a la ubicación del puzle si es ambiental
     \item Registra todas las correcciones aplicadas para facilitar el análisis posterior
 \end{itemize}
 
-Esta estrategia de crear elementos faltantes contrasta con el enfoque adoptado para las pistas de misterio (que se describirá en la siguiente subsección), donde eliminamos pistas inválidas en lugar de crear los elementos referenciados. La diferencia refleja las distintas prioridades: los puzzles son obstáculos activos que bloquean progresión y deben funcionar correctamente, mientras que las pistas son elementos opcionales de descubrimiento que pueden ajustarse en cantidad sin comprometer la jugabilidad fundamental.
+Esta estrategia de crear elementos faltantes contrasta con el enfoque adoptado para las pistas de misterio (que se describirá en la siguiente subsección), donde eliminamos pistas inválidas en lugar de crear los elementos referenciados. La diferencia refleja las distintas prioridades: los puzles son obstáculos activos que bloquean progresión y deben funcionar correctamente, mientras que las pistas son elementos opcionales de descubrimiento que pueden ajustarse en cantidad sin comprometer la jugabilidad fundamental.
 
-\textbf{Problema 6: Validación de respuestas.} La verificación de respuestas de puzzles presentó múltiples desafíos técnicos. Inicialmente, diferencias menores como puntuación o mayúsculas causaban que respuestas correctas fueran rechazadas (por ejemplo, ``a map'' versus ``A map.''). Implementamos normalización de respuestas que convierte todo a minúsculas, elimina puntuación al inicio y final, normaliza espacios en blanco, y remueve artículos iniciales en inglés (a, an, the).
+\textbf{Problema 6: Validación de respuestas.} La verificación de respuestas de puzles presentó múltiples desafíos técnicos. Inicialmente, diferencias menores como puntuación o mayúsculas causaban que respuestas correctas fueran rechazadas (por ejemplo, ``a map'' versus ``A map.''). Implementamos normalización de respuestas que convierte todo a minúsculas, elimina puntuación al inicio y final, normaliza espacios en blanco, y remueve artículos iniciales en inglés (a, an, the).
 
 Sin embargo, persisten limitaciones con sinónimos y respuestas semánticamente equivalentes. En el Capítulo \ref{cap:evaluacion} presentaremos cómo un evaluador respondió ``humans'' en lugar de la respuesta esperada ``man'', siendo marcado como incorrecto. Esto evidencia el problema fundamental de la validación basada en comparación de cadenas de texto: aunque empleamos el modelo de lenguaje para determinar la correctitud de la respuesta, el prompt prioriza coincidencia con la respuesta esperada. Podríamos ajustar las instrucciones para que acepte sinónimos más liberalmente, pero esto introduciría riesgos de falsos positivos donde respuestas incorrectas sean aceptadas por similitud superficial. Este problema permanece como una limitación conocida del sistema.
 
@@ -246,7 +246,7 @@ La clase \verb|Objective| experimentó cambios sustanciales respecto a la implem
 
 \begin{itemize}
     \item \textbf{type}: Tipo de objetivo según la taxonomía que describiremos a continuación
-    \item \textbf{components}: Lista de componentes involucrados (p. ej.: ítems, personajes, ubicaciones). Todos los componentes referenciados deben existir en el mundo
+    \item \textbf{components}: Lista de componentes involucrados (p. ej.: objetos, personajes, ubicaciones). Todos los componentes referenciados deben existir en el mundo
     \item \textbf{description}: Descripción clara de lo que el jugador debe lograr (p.~ej.: ``Debes encontrar el medallón dorado escondido en la mansión'')
     \item \textbf{success\_conditions}: Condiciones específicas que deben cumplirse para completar el objetivo
     \item \textbf{completion\_narration}: Descripción narrativa de lo que sucede tras completar el objetivo. Este atributo no se usa en objetivos de tipo \verb|solve_mystery| porque estos tienen su propio mecanismo de conclusión mediante \verb|mystery_solution|
@@ -265,23 +265,23 @@ Definimos cinco tipos de objetivos, algunos inspirados en los mundos diseñados 
     \item \textbf{SOLVE\_MYSTERY}: El jugador debe descubrir todas las pistas asociadas a un misterio
 \end{itemize}
 
-Al igual que con los puzzles, la generación automática de objetivos presentó varios problemas que requirieron soluciones específicas.
+Al igual que con los puzles, la generación automática de objetivos presentó varios problemas que requirieron soluciones específicas.
 
 \textbf{Problema fundamental: Objetivos imposibles.} El primer problema crítico que enfrentamos fue que el modelo de lenguaje generaba objetivos imposibles de completar. En experimentos preliminares observamos objetivos que pedían conseguir objetos que no habían sido incluidos en la lista de elementos del mundo, llegar a lugares inexistentes, o encontrar personajes no ubicados en ninguna localización. Este fue uno de los primeros problemas que motivó la implementación de validaciones exhaustivas.
 
-Es importante mencionar que esta validación no era necesaria en PAYADOR original porque los objetivos los creaba una persona que validaba manualmente la coherencia, pero en nuestro sistema los crea un modelo de lenguaje y por eso implementamos verificaciones simbólicas. Desarrollamos una función de verificación (\verb|verify_objective_completability|) que valida para cada tipo de objetivo:
+Es importante mencionar que esta validación no era necesaria en PAYADOR original porque los objetivos los creaba una persona que validaba manualmente la coherencia, pero en nuestro sistema los crea un modelo de lenguaje y por eso implementamos verificaciones simbólicas. Desarrollamos una función de verificación que valida para cada tipo de objetivo:
 
 \begin{itemize}
     \item \textbf{REACH\_LOCATION}: La ubicación objetivo existe y es alcanzable desde la ubicación inicial
-    \item \textbf{GET\_ITEM}: El ítem objetivo existe, está ubicado en algún lugar accesible (ubicación o inventario de personaje), y tiene \verb|gettable=True|
-    \item \textbf{DELIVER\_AN\_ITEM}: Tanto el ítem como el destino (ubicación o personaje) existen y son accesibles
+    \item \textbf{GET\_ITEM}: El objeto objetivo existe, está ubicado en algún lugar accesible (ubicación o inventario de personaje), y tiene \verb|gettable=True|
+    \item \textbf{DELIVER\_AN\_ITEM}: Tanto el objeto como el destino (ubicación o personaje) existen y son accesibles
     \item \textbf{FIND\_CHARACTER}: El personaje objetivo existe y está ubicado en una localización válida
-    \item \textbf{SOLVE\_MYSTERY}: Todas las pistas del misterio están asociadas con ítems que existen en el mundo
+    \item \textbf{SOLVE\_MYSTERY}: Todas las pistas del misterio están asociadas con objetos que existen en el mundo
 \end{itemize}
 
 \textbf{Problema: Objetivos compuestos y mecánicas no soportadas.} En experimentos preliminares, el modelo frecuentemente creaba objetivos compuestos como ``encuentra las 3 reliquias y únelas para armar la llave'' o ``consigue los 4 cristales elementales para activar el portal''. Estos objetivos presentaban dos problemas fundamentales: primero, el código no estaba preparado para manejar múltiples elementos como una sola unidad cohesiva; segundo, las mecánicas de combinación de objetos no existen en el motor de PAYADOR (como mencionamos previamente, no hay transformación para combinar objetos y crear otros).
 
-Consideramos implementar un tipo de objetivo \verb|get_items| que se completara progresivamente. Sin embargo, esto generó múltiples problemas y confusiones tanto en la implementación como en la experiencia del jugador. La solución más simple y robusta fue establecer reglas explícitas en el prompt (que se detallará en el anexo correspondiente, ver Sección \ref{anexo:prompts}) que limitaran la complejidad de los objetivos: un solo ítem para \verb|GET_ITEM|, una sola ubicación para \verb|REACH_LOCATION|, un solo personaje para \verb|FIND_CHARACTER|, y un ítem con un destino para \verb|DELIVER_AN_ITEM|.
+Consideramos implementar un tipo de objetivo \verb|get_items| que se completara progresivamente. Sin embargo, esto generó múltiples problemas y confusiones tanto en la implementación como en la experiencia del jugador. La solución más simple y robusta fue establecer reglas explícitas en el prompt (que se detallará en el anexo correspondiente, ver Sección \ref{anexo:prompts}) que limitaran la complejidad de los objetivos: un solo objeto para \verb|GET_ITEM|, una sola ubicación para \verb|REACH_LOCATION|, un solo personaje para \verb|FIND_CHARACTER|, y un objeto con un destino para \verb|DELIVER_AN_ITEM|.
 
 Esta restricción simplificó dramáticamente la verificación de completitud del objetivo y eliminó la ambigüedad sobre qué elementos eran requeridos versus opcionales.
 
@@ -295,26 +295,26 @@ Sin embargo, como presentaremos en el Capítulo \ref{cap:evaluacion}, la narraci
 
 \subsection{Objetivos de Misterio: Diseño y Desafíos} \label{subsec:objetivos_misterio}
 
-El tipo de objetivo \verb|solve_mystery| requirió el diseño más complejo de todos los tipos de objetivos y recibió mayor atención durante el desarrollo. A diferencia de los demás tipos que se verifican mediante condiciones directas sobre el estado del mundo (posesión de un ítem, presencia en una ubicación), los objetivos de misterio se completan cuando el jugador descubre todas las pistas asociadas. El sistema opera de la siguiente manera:
+El tipo de objetivo \verb|solve_mystery| requirió el diseño más complejo de todos los tipos de objetivos y recibió mayor atención durante el desarrollo. A diferencia de los demás tipos que se verifican mediante condiciones directas sobre el estado del mundo (posesión de un objeto, presencia en una ubicación), los objetivos de misterio se completan cuando el jugador descubre todas las pistas asociadas. El sistema opera de la siguiente manera:
 
 \begin{itemize}
-    \item Cada pista (\verb|MysteryClue|) está asociada con un ítem físico del mundo
-    \item Cuando el jugador interactúa con un ítem que tiene una pista asociada, la parte simbólica del sistema detecta la interacción y marca la pista como descubierta
+    \item Cada pista (\verb|MysteryClue|) está asociada con un objeto físico del mundo
+    \item Cuando el jugador interactúa con un objeto que tiene una pista asociada, la parte simbólica del sistema detecta la interacción y marca la pista como descubierta
     \item Se muestra al jugador un mensaje especial con el nombre de la pista, su descripción, su relevancia con respecto a resolver el misterio, y el progreso actual (por ejemplo: ``2 de 4 pistas descubiertas'')
     \item Al descubrir todas las pistas, el objetivo se completa y se revela el \verb|mystery_solution|
 \end{itemize}
 
-Al igual que hicimos para los puzzles, también incluimos reglas especiales en el prompt para favorecer que los objetivos de misterio se generen correctamente. Las reglas principales especifican que:
+Al igual que hicimos para los puzles, también incluimos reglas especiales en el prompt para favorecer que los objetivos de misterio se generen correctamente. Las reglas principales especifican que:
 
 \begin{itemize}
-    \item Cada pista debe estar asociada únicamente con un objeto o ítem físico que existe en el mundo, nunca con personajes o ubicaciones. El atributo \verb|associated_item| debe corresponder exactamente al nombre de un objeto que aparece en la lista de ítems del mundo
+    \item Cada pista debe estar asociada únicamente con un objeto o objeto físico que existe en el mundo, nunca con personajes o ubicaciones. El atributo \verb|associated_item| debe corresponder exactamente al nombre de un objeto que aparece en la lista de objetos del mundo
     \item El objetivo debe especificar explícitamente la lista \verb|mystery_clues| (pistas detalladas) y \verb|mystery_solution| (solución completa del misterio)
     \item En este caso no se usa \verb|completion_narration|; en su lugar se presenta la solución del misterio mediante \verb|mystery_solution|
 \end{itemize}
 
-Similar al problema de recompensas inexistentes en puzzles, enfrentamos situaciones donde las pistas de misterio referenciaban ítems que no existían en el mundo. Sin embargo, adoptamos una estrategia opuesta a la usada con puzzles: en lugar de crear los ítems faltantes, eliminamos las pistas inválidas.
+Similar al problema de recompensas inexistentes en puzles, enfrentamos situaciones donde las pistas de misterio referenciaban objetos que no existían en el mundo. Sin embargo, adoptamos una estrategia opuesta a la usada con puzles: en lugar de crear los objetos faltantes, eliminamos las pistas inválidas.
 
-Esta decisión se tomó porque crear ítems automáticamente para pistas podía resultar en objetos desconectados de la narrativa, mientras que eliminar pistas simplemente reducía el número de pistas a descubrir, manteniendo la coherencia del mundo. Esta diferencia en el enfoque de validación refleja las diferentes prioridades mencionadas anteriormente: los puzzles son obstáculos activos que bloquean progresión y deben funcionar correctamente, mientras que las pistas son elementos opcionales de descubrimiento que pueden ajustarse en cantidad sin comprometer la jugabilidad fundamental.
+Esta decisión se tomó porque crear objetos automáticamente para pistas podía resultar en objetos desconectados de la narrativa, mientras que eliminar pistas simplemente reducía el número de pistas a descubrir, manteniendo la coherencia del mundo. Esta diferencia en el enfoque de validación refleja las diferentes prioridades mencionadas anteriormente: los puzles son obstáculos activos que bloquean progresión y deben funcionar correctamente, mientras que las pistas son elementos opcionales de descubrimiento que pueden ajustarse en cantidad sin comprometer la jugabilidad fundamental.
 
 Como presentaremos en el Capítulo \ref{cap:evaluacion}, esta estrategia de eliminación ocasionalmente resultó en objetivos de misterio con muy pocas pistas, lo cual contribuyó al problema donde un evaluador completó el objetivo más rápidamente de lo anticipado y experimentó confusión sobre si el juego había terminado.
 
@@ -366,11 +366,11 @@ El prompt de esta etapa (disponible en el Anexo \ref{anexo:prompts}, Sección \r
 
 En el modo \textit{Generate}, el prompt enfatiza la autonomía completa del modelo de lenguaje. Le indicamos explícitamente que tiene libertad para inventar cualquier tipo de historia, con ambientaciones diversas (p. ej.: medieval, ciencia ficción, moderna, fantástica), personajes únicos con personalidades interesantes, y objetivos desafiantes. También le sugerimos categorías temáticas amplias como inspiración (p. ej.: misterio, aventura, supervivencia, social, exploración) que puede elegir o combinar libremente, pero sin imponer restricciones. El énfasis está en la creatividad sin límites y en la generación de conceptos originales.
 
-Sin embargo, durante las pruebas iniciales con el modo \textit{Inspiration}, observamos un problema recurrente: aunque mencionábamos el tema proporcionado por el usuario al inicio del prompt, el modelo tendía a generar mundos donde solamente la ambientación general guardaba relación con la temática. Los NPCs, puzzles y especialmente el objetivo principal frecuentemente se desviaban hacia elementos genéricos sin conexión clara con el tema especificado. Por ejemplo, en un mundo con tema ``piratas del Caribe'', podríamos obtener una ambientación pirata pero con un objetivo de resolver un acertijo matemático abstracto, o NPCs con motivaciones completamente desvinculadas del contexto pirata.
+Sin embargo, durante las pruebas iniciales con el modo \textit{Inspiration}, observamos un problema recurrente: aunque mencionábamos el tema proporcionado por el usuario al inicio del prompt, el modelo tendía a generar mundos donde solamente la ambientación general guardaba relación con la temática. Los NPCs, puzles y especialmente el objetivo principal frecuentemente se desviaban hacia elementos genéricos sin conexión clara con el tema especificado. Por ejemplo, en un mundo con tema ``piratas del Caribe'', podríamos obtener una ambientación pirata pero con un objetivo de resolver un acertijo matemático abstracto, o NPCs con motivaciones completamente desvinculadas del contexto pirata.
 
-Para resolver este problema, diseñamos una estrategia de \textbf{reiteración temática constante} en el prompt. En lugar de mencionar el tema una sola vez, lo reforzamos en múltiples secciones, estableciendo que el tema proporcionado debe ser la base fundamental de todo el concepto del mundo, que cada ubicación, personaje, objeto y especialmente el objetivo principal deben ser manifestaciones directas del tema, que el modelo no debe inventar elementos desconectados, que los personajes deben representar diferentes facetas del tema, que el objetivo principal debe estar intrínsecamente relacionado con la temática, y que los puzzles imaginados para etapas posteriores deben surgir naturalmente del tema.
+Para resolver este problema, diseñamos una estrategia de \textbf{reiteración temática constante} en el prompt. En lugar de mencionar el tema una sola vez, lo reforzamos en múltiples secciones, estableciendo que el tema proporcionado debe ser la base fundamental de todo el concepto del mundo, que cada ubicación, personaje, objeto y especialmente el objetivo principal deben ser manifestaciones directas del tema, que el modelo no debe inventar elementos desconectados, que los personajes deben representar diferentes facetas del tema, que el objetivo principal debe estar intrínsecamente relacionado con la temática, y que los puzles imaginados para etapas posteriores deben surgir naturalmente del tema.
 
-Esta reiteración constante resultó ser clave para mantener la coherencia temática. Al enfatizar la obligación temática en cada sección relevante del prompt (no solamente al principio), logramos que el modelo mantuviera la coherencia temática no únicamente en la ambientación superficial, sino en todos los elementos estructurales del mundo, especialmente en aquellos que afectan directamente la jugabilidad como el objetivo, los puzzles futuros y las motivaciones de los NPCs.
+Esta reiteración constante resultó ser clave para mantener la coherencia temática. Al enfatizar la obligación temática en cada sección relevante del prompt (no solamente al principio), logramos que el modelo mantuviera la coherencia temática no únicamente en la ambientación superficial, sino en todos los elementos estructurales del mundo, especialmente en aquellos que afectan directamente la jugabilidad como el objetivo, los puzles futuros y las motivaciones de los NPCs.
 
 \subsubsection{Paso 2: El Esqueleto del Mundo}
 
@@ -381,17 +381,17 @@ En esta etapa se utilizan parámetros de configuración especificados por el usu
 \begin{itemize}
     \item \textbf{Número de ubicaciones}: Define la cantidad de lugares del mundo
     \item \textbf{Cantidad de NPCs}: Determina cuántos personajes pueblan el mundo
-    \item \textbf{Cantidad de ítems}: Especifica el número de objetos interactuables
-    \item \textbf{Número de puzzles}: Establece cuántos desafíos incluir
+    \item \textbf{Cantidad de objetos}: Especifica el número de objetos interactuables
+    \item \textbf{Número de puzles}: Establece cuántos desafíos incluir
 \end{itemize}
 
-Incorporamos estos parámetros en el prompt del modelo de forma explícita (esta prompt está disponible en el Anexo \ref{anexo:prompts}, donde se puede ver que la función que la genera recibe como parámetros estos valores que mencionamos), garantizando que el esqueleto generado respete las restricciones de tamaño. Por ejemplo, si el usuario especifica 5 ubicaciones, el modelo de lenguaje tiene que generar 5 ubicaciones, y si especifica un rango (por ejemplo: 2 a 4 puzzles), tiene que generar un número de puzzles en ese rango.
+Incorporamos estos parámetros en el prompt del modelo de forma explícita (esta prompt está disponible en el Anexo \ref{anexo:prompts}, donde se puede ver que la función que la genera recibe como parámetros estos valores que mencionamos), garantizando que el esqueleto generado respete las restricciones de tamaño. Por ejemplo, si el usuario especifica 5 ubicaciones, el modelo de lenguaje tiene que generar 5 ubicaciones, y si especifica un rango (por ejemplo: 2 a 4 puzles), tiene que generar un número de puzles en ese rango.
 
 Durante las pruebas iniciales observamos que el modelo tendía a generar entidades (p. ej.: ubicaciones, NPCs, objetos) que, aunque temáticamente coherentes, carecían de conexión funcional con el objetivo principal. Esto resultaba en mundos donde el jugador podía encontrarse con elementos interesantes pero irrelevantes para completar la aventura. Para mitigar este problema, establecimos reglas explícitas en el prompt de esta etapa.
 
 Primero, cada entidad generada debe tener una relación identificable con el camino hacia el objetivo. No basta con que sean temáticamente apropiadas; deben tener un propósito dentro de la progresión del juego. Segundo, debe existir una ruta lógica hacia el objetivo: una secuencia clara de eventos, ubicaciones y acciones que permitan al jugador avanzar desde el punto de partida hasta la consecución del objetivo. Esta ruta no necesariamente debe ser lineal, pero sí debe ser identificable y coherente.
 
-Sin embargo, como se detallará en el Capítulo \ref{cap:evaluacion}, la evaluación con jugadores humanos reveló que esto no fue completamente suficiente. En varios mundos generados seguimos encontrando puzzles, ítems o NPCs que no tenían un propósito real para alcanzar el objetivo. Esta característica puede interpretarse de dos maneras: como una limitación del sistema que genera contenido irrelevante, o como un elemento de ambientación con contenido exploratorio opcional y accesorio. La valoración depende en última instancia de las expectativas y preferencias del jugador: algunos usuarios pueden apreciar la profundidad adicional y la sensación de un mundo más vívido, mientras que otros pueden preferir experiencias más optimizadas donde cada elemento tenga un propósito claro.
+Sin embargo, como se detallará en el Capítulo \ref{cap:evaluacion}, la evaluación con jugadores humanos reveló que esto no fue completamente suficiente. En varios mundos generados seguimos encontrando puzles, objetos o NPCs que no tenían un propósito real para alcanzar el objetivo. Esta característica puede interpretarse de dos maneras: como una limitación del sistema que genera contenido irrelevante, o como un elemento de ambientación con contenido exploratorio opcional y accesorio. La valoración depende en última instancia de las expectativas y preferencias del jugador: algunos usuarios pueden apreciar la profundidad adicional y la sensación de un mundo más vívido, mientras que otros pueden preferir experiencias más optimizadas donde cada elemento tenga un propósito claro.
 
 La salida de esta etapa es una lista de entidades sin detalles exhaustivos, funcionando como un esqueleto que será completado en etapas posteriores, pero ya con las cantidades definidas que guiarán el resto del pipeline. La Figura \ref{fig:ejemplo_esqueleto} muestra un ejemplo de la salida de esta etapa.
 
@@ -403,7 +403,7 @@ La salida de esta etapa es una lista de entidades sin detalles exhaustivos, func
 {
   "key_locations": [
     {"name": "Entrada del Templo", "purpose": "Punto de inicio"},
-    {"name": "Sala de las Estatuas", "purpose": "Puzzle principal"},
+    {"name": "Sala de las Estatuas", "purpose": "Puzle principal"},
     {"name": "Cámara del Tesoro", "purpose": "Ubicación del objetivo"}
   ],
   "key_items": [
@@ -412,7 +412,7 @@ La salida de esta etapa es una lista de entidades sin detalles exhaustivos, func
     {"name": "Medallón Dorado", "purpose": "Objetivo principal"}
   ],
   "key_characters": [
-    {"name": "Guardián del Templo", "purpose": "Propone puzzle de estatuas"}
+    {"name": "Guardián del Templo", "purpose": "Propone puzle de estatuas"}
   ]
 }
 \end{verbatim}
@@ -433,37 +433,37 @@ Como el tamaño del mundo se fijó en el Paso 2, en esta etapa se le indica clar
 
 Adicionalmente, establecimos reglas obligatorias de conexión entre ubicaciones. Si la ubicación A conecta con B, entonces B debe conectar con A, evitando conexiones unidireccionales accidentales que podrían atrapar al jugador. Todas las ubicaciones deben ser accesibles desde cualquier punto del mundo, sin ubicaciones aisladas o grupos desconectados. Finalmente, el objetivo debe ser completable con los elementos creados, existiendo al menos una ruta lógica desde el estado inicial hasta su consecución.
 
-Diseñamos reglas para garantizar la consistencia funcional. Los personajes con capacidad de interacción deben contar con texto de interacción definido, y todo objeto en su inventario debe existir en la lista global de objetos, evitando referencias inexistentes. Los objetos necesarios para cumplir el objetivo principal deben ser obtenibles (\textit{gettable: true}), mientras que los decorativos pueden no serlo. Cada objeto debe tener una justificación clara: funcional (parte de un puzzle o requisito del objetivo) o atmosférica (contribuyendo a la ambientación).
+Diseñamos reglas para garantizar la consistencia funcional. Los personajes con capacidad de interacción deben contar con texto de interacción definido, y todo objeto en su inventario debe existir en la lista global de objetos, evitando referencias inexistentes. Los objetos necesarios para cumplir el objetivo principal deben ser obtenibles (\textit{gettable: true}), mientras que los decorativos pueden no serlo. Cada objeto debe tener una justificación clara: funcional (parte de un puzle o requisito del objetivo) o atmosférica (contribuyendo a la ambientación).
 
 Incorporamos en el prompt una lista de verificación que el modelo debe ejecutar antes de finalizar la generación: todas las ubicaciones deben ser accesibles desde la ubicación inicial, el jugador debe poder completar el objetivo con los elementos disponibles, debe existir al menos una ruta de solución desde el estado inicial, todos los elementos referenciados deben existir efectivamente, y en objetivos de tipo misterio, cada pista debe estar asociada a un objeto físico existente.
 
-El resultado es una estructura funcional pero lineal, enfocada exclusivamente en la ruta principal hacia el objetivo. El mundo en este punto (es decir, el mundo generado en el paso 3) es jugable y completable, aunque aún carece de los puzzles y pasajes bloqueados que añadirán complejidad en la siguiente etapa.
+El resultado es una estructura funcional pero lineal, enfocada exclusivamente en la ruta principal hacia el objetivo. El mundo en este punto (es decir, el mundo generado en el paso 3) es jugable y completable, aunque aún carece de los puzles y pasajes bloqueados que añadirán complejidad en la siguiente etapa.
 
 \subsubsection{Paso 4: Los Desafíos}
 
-Con el mundo base establecido, esta etapa introduce complejidad mediante pasajes bloqueados (conexiones entre ubicaciones que requieren condiciones específicas para desbloquearse) y puzzles (desafíos clasificados según la taxonomía presentada en la Sección \ref{subsec:clase_puzzle} que obstaculizan el progreso).
+Con el mundo base establecido, esta etapa introduce complejidad mediante pasajes bloqueados (conexiones entre ubicaciones que requieren condiciones específicas para desbloquearse) y puzles (desafíos clasificados según la taxonomía presentada en la Sección \ref{subsec:clase_puzzle} que obstaculizan el progreso).
 
 El modelo analiza el mapa generado e identifica puntos estratégicos donde insertar estos obstáculos, asegurando que existan soluciones viables y coherentes con la narrativa. El prompt para esta etapa se encuentra en el Anexo \ref{anexo:prompts}, Sección \ref{anexo:prompt_step4}.
 
-Inicialmente, diseñamos esta etapa con la ambición de crear cadenas de dependencias complejas (\textit{dependency chains}): secuencias lógicas de tareas interdependientes donde completar un paso desbloquea el siguiente. La visión era que, por ejemplo, para obtener el objetivo final, el jugador primero necesitaría la Llave A, que solo obtendría del Personaje B, quien la entregaría a cambio del Objeto C, que a su vez requeriría resolver el Puzzle D en la Ubicación E.
+Inicialmente, diseñamos esta etapa con la ambición de crear cadenas de dependencias complejas (\textit{dependency chains}): secuencias lógicas de tareas interdependientes donde completar un paso desbloquea el siguiente. La visión era que, por ejemplo, para obtener el objetivo final, el jugador primero necesitaría la Llave A, que solo obtendría del Personaje B, quien la entregaría a cambio del Objeto C, que a su vez requeriría resolver el Puzle D en la Ubicación E.
 
 Sin embargo, al hacer experimentos preliminares esta estructura demostró ser problemática. El modelo fallaba consistentemente al generar estas cadenas, produciendo mundos con errores estructurales graves (p. ej.: dependencias circulares imposibles de resolver donde A requiere B, B requiere C y C requiere A; referencias a objetos que no existían en los inventarios correctos; o generaciones sin sentido donde las relaciones de dependencia no tenían lógica coherente).
 
-Al analizar estos fallos, comprendimos que el problema radicaba en la complejidad creciente del esquema del mundo. Con cada característica que añadíamos (p. ej.: cadenas de dependencias, múltiples tipos de puzzles, diversos tipos de objetivos, validaciones cruzadas), el modelo de datos se volvía más intrincado y las restricciones más numerosas. El modelo simplemente no podía mantener toda esta información en contexto mientras generaba salidas estructuralmente válidas.
+Al analizar estos fallos, comprendimos que el problema radicaba en la complejidad creciente del esquema del mundo. Con cada característica que añadíamos (p. ej.: cadenas de dependencias, múltiples tipos de puzles, diversos tipos de objetivos, validaciones cruzadas), el modelo de datos se volvía más intrincado y las restricciones más numerosas. El modelo simplemente no podía mantener toda esta información en contexto mientras generaba salidas estructuralmente válidas.
 
-Esto nos obligó a tomar decisiones difíciles de diseño. Descartamos la implementación formal de estructuras de cadenas de dependencias; sin embargo, este no fue el único recorte. Como se detalló en las Secciones \ref{subsec:clase_puzzle} y \ref{subsec:clase_objective}, también tuvimos que reducir la cantidad de tipos de objetivos y tipos de puzzles que inicialmente habíamos planificado. La complejidad del esquema era el cuello de botella fundamental del sistema, y solo mediante simplificación estratégica pudimos lograr generaciones consistentes y jugables.
+Esto nos obligó a tomar decisiones difíciles de diseño. Descartamos la implementación formal de estructuras de cadenas de dependencias; sin embargo, este no fue el único recorte. Como se detalló en las Secciones \ref{subsec:clase_puzzle} y \ref{subsec:clase_objective}, también tuvimos que reducir la cantidad de tipos de objetivos y tipos de puzles que inicialmente habíamos planificado. La complejidad del esquema era el cuello de botella fundamental del sistema, y solo mediante simplificación estratégica pudimos lograr generaciones consistentes y jugables.
 
-Aunque descartamos la implementación formal de cadenas de dependencias, decidimos mantener esa filosofía dentro del prompt. Explicar al modelo la generación de puzzles como un ``hilo conductor lógico'' donde cada desafío está motivado por el anterior resultó mucho más efectivo que simplemente pedirle ``añadir puzzles al mundo'': los resultados eran más coherentes, mejor integrados narrativamente y con una progresión más natural.
+Aunque descartamos la implementación formal de cadenas de dependencias, decidimos mantener esa filosofía dentro del prompt. Explicar al modelo la generación de puzles como un ``hilo conductor lógico'' donde cada desafío está motivado por el anterior resultó mucho más efectivo que simplemente pedirle ``añadir puzles al mundo'': los resultados eran más coherentes, mejor integrados narrativamente y con una progresión más natural.
 
-El prompt enfatiza la conexión entre cada puzzle y un pasaje bloqueado o recurso esencial para avanzar, evitando la aparición de desafíos sin consecuencias mecánicas claras. Para reforzar esta coherencia, establecimos reglas específicas: todo pasaje bloqueado debe tener un obstáculo definido y un requisito concreto para desbloquearlo; los obstáculos y sus soluciones deben estar físicamente separados (p. ej.: no colocar la llave junto a la puerta que abre); y las soluciones deben poder descubrirse a través de la exploración.
+El prompt enfatiza la conexión entre cada puzle y un pasaje bloqueado o recurso esencial para avanzar, evitando la aparición de desafíos sin consecuencias mecánicas claras. Para reforzar esta coherencia, establecimos reglas específicas: todo pasaje bloqueado debe tener un obstáculo definido y un requisito concreto para desbloquearlo; los obstáculos y sus soluciones deben estar físicamente separados (p. ej.: no colocar la llave junto a la puerta que abre); y las soluciones deben poder descubrirse a través de la exploración.
 
-Durante las primeras pruebas observamos puzzles excesivamente complejos, donde el jugador podía quedar bloqueado sin una vía clara de avance. Para resolverlo, implementamos un sistema obligatorio de pistas asociado a cada puzzle, compuesto por tres a cinco pistas progresivas (\textit{puzzle\_hints}) que van desde una orientación general hasta una ayuda casi explícita. La efectividad de este sistema motivó la creación de pistas para los objetivos, con el fin de mantener coherencia en la asistencia ofrecida al jugador. Más adelante surgió la idea de extender este enfoque a situaciones en las que el jugador se encontrara en una ubicación con un puzzle aún no iniciado, naciendo así la pista de interacción (\textit{interaction\_hint}): una sugerencia breve que orienta al jugador sobre cómo comenzar la acción (por ejemplo: ``intenta hablar con [personaje]'', ``examina [objeto]'', ``busca pistas en esta ubicación''). Este enfoque consolidó un sistema de ayuda más orgánico y adaptativo, que se integra con el mecanismo general que se describirá en la Sección \ref{sec:sistema_hints} del Capítulo \ref{cap:implementacion}.
+Durante las primeras pruebas observamos puzles excesivamente complejos, donde el jugador podía quedar bloqueado sin una vía clara de avance. Para resolverlo, implementamos un sistema obligatorio de pistas asociado a cada puzle, compuesto por tres a cinco pistas progresivas (\textit{puzle\_hints}) que van desde una orientación general hasta una ayuda casi explícita. La efectividad de este sistema motivó la creación de pistas para los objetivos, con el fin de mantener coherencia en la asistencia ofrecida al jugador. Más adelante surgió la idea de extender este enfoque a situaciones en las que el jugador se encontrara en una ubicación con un puzle aún no iniciado, naciendo así la pista de interacción (\textit{interaction\_hint}): una sugerencia breve que orienta al jugador sobre cómo comenzar la acción (por ejemplo: ``intenta hablar con [personaje]'', ``examina [objeto]'', ``busca pistas en esta ubicación''). Este enfoque consolidó un sistema de ayuda más orgánico y adaptativo, que se integra con el mecanismo general que se describirá en la Sección \ref{sec:sistema_hints} del Capítulo \ref{cap:implementacion}.
 
-En esta etapa se mantuvieron las mismas restricciones técnicas definidas en el Paso 3, que limitan la capacidad del modelo para alterar la estructura del mundo: no se permite crear nuevas ubicaciones, deben preservarse las rutas de conectividad global entre ellas, y se prohíben mecánicas de combinación o transformación de objetos, dado que el motor del juego no las soporta. Adicionalmente, si un puzzle otorgado por un personaje incluye una recompensa física, el objeto correspondiente debe existir previamente y encontrarse en el inventario de dicho personaje.
+En esta etapa se mantuvieron las mismas restricciones técnicas definidas en el Paso 3, que limitan la capacidad del modelo para alterar la estructura del mundo: no se permite crear nuevas ubicaciones, deben preservarse las rutas de conectividad global entre ellas, y se prohíben mecánicas de combinación o transformación de objetos, dado que el motor del juego no las soporta. Adicionalmente, si un puzle otorgado por un personaje incluye una recompensa física, el objeto correspondiente debe existir previamente y encontrarse en el inventario de dicho personaje.
 
 Sobre esta base, el modelo cuenta con cierta libertad para realizar una redistribución estratégica de los objetos del mundo, con el fin de ajustar la dificultad y el equilibrio narrativo. Esto implica poder mover elementos relevantes a ubicaciones menos accesibles o asignarlos a personajes que los entreguen mediante intercambio, siempre que la modificación mantenga coherencia lógica y motivación narrativa dentro del contexto del mundo.
 
-El resultado de esta etapa es un mundo con obstáculos estratégicamente distribuidos que hacen la experiencia más desafiante. Aunque no implementamos cadenas de dependencias formales, los puzzles generados mantienen coherencia narrativa y progresión lógica gracias a la filosofía de diseño preservada en el prompt.
+El resultado de esta etapa es un mundo con obstáculos estratégicamente distribuidos que hacen la experiencia más desafiante. Aunque no implementamos cadenas de dependencias formales, los puzles generados mantienen coherencia narrativa y progresión lógica gracias a la filosofía de diseño preservada en el prompt.
 
 \subsubsection{Paso 5: Expansión del Mundo (Opcional)}
 
@@ -484,7 +484,7 @@ Las validaciones se ejecutan en puntos específicos del pipeline, aprovechando q
 \begin{itemize}
     \item \textbf{Paso 2}: Validación de esquema más verificación de tamaños configurados
     \item \textbf{Paso 3}: Validación de esquema más conectividad de ubicaciones (mediante búsqueda en profundidad) más completabilidad del objetivo
-    \item \textbf{Paso 4}: Validación de esquema más recompensas de puzzles más re-validación de conectividad y completabilidad
+    \item \textbf{Paso 4}: Validación de esquema más recompensas de puzles más re-validación de conectividad y completabilidad
 \end{itemize}
 
 Si cualquier validación falla, se descarta la generación y se reintenta el paso correspondiente. El sistema implementa un máximo de tres intentos por paso; tras agotarlos, el pipeline completo falla con una excepción descriptiva que indica qué validación específica no pudo ser satisfecha.
@@ -495,15 +495,15 @@ Esta validación verifica que la salida del modelo de lenguaje cumpla con la est
 
 Implementada mediante búsqueda en profundidad (DFS) sobre el grafo de ubicaciones, esta validación detecta particiones en el mundo. Construimos un diccionario de adyacencia que incluye tanto conexiones normales como pasajes bloqueados (que son conexiones estructuralmente presentes, solamente que temporalmente inaccesibles), ejecutamos DFS desde la primera ubicación y comparamos el conjunto de nodos visitados contra el conjunto total de ubicaciones. Si detectamos ubicaciones no alcanzables, se registra información detallada con la lista de ubicaciones aisladas y el mapa de adyacencia completo para facilitar el diagnóstico.
 
-Esta validación verifica que el objetivo sea alcanzable con los elementos disponibles en el mundo. Para cada tipo de objetivo se realizan verificaciones específicas, como se describió en la Sección \ref{subsec:clase_objective}. Por ejemplo, para \verb|GET_ITEM| se verifica que el ítem exista, esté ubicado en algún lugar accesible y tenga la propiedad \verb|gettable=True|.
+Esta validación verifica que el objetivo sea alcanzable con los elementos disponibles en el mundo. Para cada tipo de objetivo se realizan verificaciones específicas, como se describió en la Sección \ref{subsec:clase_objective}. Por ejemplo, para \verb|GET_ITEM| se verifica que el objeto exista, esté ubicado en algún lugar accesible y tenga la propiedad \verb|gettable=True|.
 
-A diferencia de las validaciones anteriores que rechazan mundos inválidos, la verificación de recompensas de puzzles implementa una estrategia de reparación. Si un puzzle otorga como recompensa un objeto que no existe en el mundo, el sistema lo crea automáticamente y lo coloca en el inventario del personaje que propone el puzzle (o en la ubicación del puzzle si es ambiental). Esta heurística refleja una observación del desarrollo: cuando el modelo menciona un objeto recompensa inexistente, generalmente es una omisión coherente con la narrativa, no un error conceptual fundamental. Crear el objeto permite continuar la generación en lugar de rechazar todo el mundo.
+A diferencia de las validaciones anteriores que rechazan mundos inválidos, la verificación de recompensas de puzles implementa una estrategia de reparación. Si un puzle otorga como recompensa un objeto que no existe en el mundo, el sistema lo crea automáticamente y lo coloca en el inventario del personaje que propone el puzle (o en la ubicación del puzle si es ambiental). Esta heurística refleja una observación del desarrollo: cuando el modelo menciona un objeto recompensa inexistente, generalmente es una omisión coherente con la narrativa, no un error conceptual fundamental. Crear el objeto permite continuar la generación en lugar de rechazar todo el mundo.
 
 \subsection{Estrategias Diferenciadas: Corrección vs. Rechazo}
 
-Las recompensas faltantes en puzzles se corrigen automáticamente dentro del intento actual, permitiendo recuperar mundos con omisiones menores. Por otro lado, los objetivos imposibles causan rechazo y reintento completo del paso. Esta asimetría refleja diferencias en criticidad: los puzzles son problemas localizados y corregibles, mientras que los objetivos imposibles invalidan la jugabilidad completa del mundo.
+Las recompensas faltantes en puzles se corrigen automáticamente dentro del intento actual, permitiendo recuperar mundos con omisiones menores. Por otro lado, los objetivos imposibles causan rechazo y reintento completo del paso. Esta asimetría refleja diferencias en criticidad: los puzles son problemas localizados y corregibles, mientras que los objetivos imposibles invalidan la jugabilidad completa del mundo.
 
-Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el modelo es consistentemente inconsistente (generando repetidamente objetivos con ítems que no incluye en la lista de elementos del mundo), los tres reintentos fallarán y el pipeline completo fallará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzzles. El modelo puede omitir un ítem importante del objetivo en \verb|world.items| aunque lo referencie en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
+Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el modelo es consistentemente inconsistente (generando repetidamente objetivos con objetos que no incluye en la lista de elementos del mundo), los tres reintentos fallarán y el pipeline completo fallará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzles. El modelo puede omitir un objeto importante del objetivo en \verb|world.items| aunque lo referencie en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
 
 Como se discutirá en el Capítulo \ref{cap:evaluacion}, esta fragilidad resultó en algunos mundos que, tras agotar los reintentos, pasaron las validaciones pero presentaron problemas sutiles durante el juego real, evidenciando que la validación post-generación no puede compensar completamente la inconsistencia inherente del modelo durante la generación.
 
@@ -542,7 +542,7 @@ La integración con modelos de lenguaje es uno de los desafíos centrales del en
 
 Los modelos de lenguaje modernos pueden generar salidas estructuradas en JSON cuando se les solicita explícitamente en el prompt, pero sin validación automática esto resulta frágil: el modelo puede omitir campos, usar tipos incorrectos, o generar estructuras mal formadas. Implementamos modelos Pydantic que definen esquemas tipados con validaciones embebidas. Cuando el modelo genera una salida que no cumple con el esquema, Pydantic rechaza automáticamente la estructura antes de que llegue al motor del juego, aunque es importante aclarar que Pydantic no reintenta autónomamente la llamada al modelo de lenguaje; esa responsabilidad recae en la lógica del pipeline que describiremos más adelante.
 
-La arquitectura de modelos sigue la jerarquía del mundo de juego. En el nivel superior tenemos \verb|GeneratedWorld|, que encapsula listas de ubicaciones generadas (\verb|List[GeneratedLocation]|), objetos generados (\verb|List[GeneratedItem]|), puzzles generados (\verb|List[GeneratedPuzzle]|), el personaje del jugador (\verb|GeneratedCharacter|), y el objetivo principal (\verb|GeneratedObjective|). Todos estos son modelos Pydantic especializados.
+La arquitectura de modelos sigue la jerarquía del mundo de juego. En el nivel superior tenemos \verb|GeneratedWorld|, que encapsula listas de ubicaciones generadas (\verb|List[GeneratedLocation]|), objetos generados (\verb|List[GeneratedItem]|), puzles generados (\verb|List[GeneratedPuzzle]|), el personaje del jugador (\verb|GeneratedCharacter|), y el objetivo principal (\verb|GeneratedObjective|). Todos estos son modelos Pydantic especializados.
 
 Definimos enumeraciones para tipos de entidades críticas, forzando al modelo a usar valores válidos. Por ejemplo, \verb|ItemActionType| es una enumeración que restringe las acciones de objetos a cuatro categorías que el motor puede procesar: \verb|UNLOCK_PASSAGE| para llaves, \verb|SOLVE_PUZZLE| para pistas, \verb|GIVE_TO_CHARACTER| para entregas y \verb|LORE| para elementos decorativos. Esto elimina la ambigüedad que observamos en experimentos preliminares donde el modelo generaba nombres de acciones que el motor no reconocía.
 
@@ -563,13 +563,13 @@ Esta descripción instruye al modelo sobre la relación entre \verb|is_objective
 
 Un caso más complejo es \verb|GeneratedLocation.items|, cuya descripción advierte: \textit{``An item required to unlock a passage CANNOT be placed in the location behind that very passage or any location only accessible through it''}. Esta regla intenta prevenir configuraciones imposibles donde la llave está del otro lado de la puerta que debe abrir, aunque es importante aclarar que esto es una instrucción para guiar al modelo, no una verificación automática de Pydantic.
 
-Para puzzles implementamos un sistema de recompensas tipadas mediante herencia de Pydantic. \verb|PuzzleReward| es la clase base con \verb|reward_type: RewardType|, y las subclases especializan el comportamiento: \verb|PassageReward| desbloquea un pasaje entre dos ubicaciones existentes, \verb|ItemReward| otorga un objeto del mundo al inventario del jugador, y \verb|ObjectiveReward| marca el objetivo principal como completado.
+Para puzles implementamos un sistema de recompensas tipadas mediante herencia de Pydantic. \verb|PuzzleReward| es la clase base con \verb|reward_type: RewardType|, y las subclases especializan el comportamiento: \verb|PassageReward| desbloquea un pasaje entre dos ubicaciones existentes, \verb|ItemReward| otorga un objeto del mundo al inventario del jugador, y \verb|ObjectiveReward| marca el objetivo principal como completado.
 
 Esta jerarquía le permite al motor aplicar la recompensa correcta automáticamente mediante polimorfismo, y al modelo de lenguaje generar recompensas válidas sin necesidad de instrucciones complejas en los prompts.
 
 Los esquemas documentan explícitamente las restricciones de referencia mediante anotaciones en las descripciones. Por ejemplo, \verb|GeneratedPuzzle.proposed_by_character| especifica: \textit{``Note: if specified, this character must exist in the world''}. Si bien Pydantic no valida estas referencias automáticamente (requeriría acceso al contexto del mundo completo durante el parsing), estas anotaciones cumplen dos funciones: instruyen al modelo sobre la restricción durante la generación, y documentan las validaciones que luego ejecutamos explícitamente en el pipeline de generación.
 
-Estas validaciones post-parsing incluyen verificar conectividad bidireccional de ubicaciones, existencia de ítems referenciados en inventarios, y validez de las relaciones de dependencia. Las implementamos en funciones especializadas como \verb|verify_location_connectivity()| y \verb|verify_objective_completability()| (descritas en la Sección \ref{sec:validaciones} del capítulo anterior) que rechazan mundos con referencias a objetos que no existen en el sistema orientado a objetos.
+Estas validaciones post-parsing incluyen verificar conectividad bidireccional de ubicaciones, existencia de objetos referenciados en inventarios, y validez de las relaciones de dependencia. Las implementamos en funciones especializadas (descritas en la Sección \ref{sec:validaciones} del capítulo anterior) que rechazan mundos con referencias a objetos que no existen en el sistema orientado a objetos.
 
 Para soportar la generación en etapas implementamos modelos intermedios. \verb|WorldConcept| captura solamente el concepto inicial (título, historia de fondo, concepto del jugador, objetivo general), y \verb|WorldSkeleton| define las entidades clave mediante \verb|KeyEntity| (nombre más propósito) sin detalles completos. Esto permite que cada paso del pipeline genere y valide su salida antes de pasar al siguiente.
 
@@ -585,21 +585,21 @@ La función \verb|create_world_incrementally()| coordina la ejecución secuencia
     \item \textbf{Paso 1} (Concepto del mundo): Genera título, backstory, concepto del jugador y objetivo
     \item \textbf{Paso 2} (Esqueleto): Identifica entidades clave con cantidades configuradas
     \item \textbf{Paso 3} (Mundo jugable): Materializa el esqueleto con detalles y conexiones
-    \item \textbf{Paso 4} (Desafíos): Introduce puzzles y pasajes bloqueados
+    \item \textbf{Paso 4} (Desafíos): Introduce puzles y pasajes bloqueados
     \item \textbf{Paso 5} (Expansión opcional): Enriquece con contenido adicional
 \end{itemize}
 
-Implementamos un sistema de reintentos con un máximo de tres intentos por paso, ejecutando validaciones específicas según la etapa. Para el Paso 2, validamos el esquema Pydantic más la verificación de tamaños configurados. Para el Paso 3, validamos el esquema Pydantic más conectividad de ubicaciones mediante búsqueda en profundidad más completabilidad del objetivo. Para el Paso 4, validamos el esquema Pydantic más recompensas de puzzles más re-validación de conectividad y completabilidad.
+Implementamos un sistema de reintentos con un máximo de tres intentos por paso, ejecutando validaciones específicas según la etapa. Para el Paso 2, validamos el esquema Pydantic más la verificación de tamaños configurados. Para el Paso 3, validamos el esquema Pydantic más conectividad de ubicaciones mediante búsqueda en profundidad más completabilidad del objetivo. Para el Paso 4, validamos el esquema Pydantic más recompensas de puzles más re-validación de conectividad y completabilidad.
 
 Si cualquier validación falla, se descarta la generación y se reintenta el paso. Escribimos fluidamente la lógica: el sistema registra el error específico, incrementa el contador de intentos y regenera desde el modelo de lenguaje. Tras tres intentos fallidos, el pipeline completo falla con excepción descriptiva.
 
-Las recompensas faltantes en puzzles se corrigen automáticamente dentro del intento actual mediante \verb|verify_puzzle_rewards_and_fix()|, permitiendo recuperar mundos con omisiones menores. Por otro lado, los objetivos imposibles causan rechazo y reintento completo del paso. Esta asimetría refleja diferencias en criticidad: cuando un puzzle presenta un error estructural, el sistema puede corregirlo localmente; en cambio, cuando un objetivo es imposible de completar, el mundo completo se vuelve injugable y debe regenerarse.
+Las recompensas faltantes en puzles se corrigen automáticamente dentro del intento actual mediante una función especializada, permitiendo recuperar mundos con omisiones menores. Por otro lado, los objetivos imposibles causan rechazo y reintento completo del paso. Esta asimetría refleja diferencias en criticidad: cuando un puzle presenta un error estructural, el sistema puede corregirlo localmente; en cambio, cuando un objetivo es imposible de completar, el mundo completo se vuelve injugable y debe regenerarse.
 
-Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el modelo es consistentemente inconsistente (generando repetidamente objetivos con ítems que no incluye en la lista de elementos del mundo), los tres reintentos fallarán y el pipeline fallará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzzles (volveremos a esto más adelante, al detallar la clase Puzzle en el contexto de implementación). El modelo puede omitir un ítem importante del objetivo en \verb|world.items| aunque lo referencie en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
+Sin embargo, esta estrategia de rechazo para objetivos presenta una limitación fundamental: si el modelo es consistentemente inconsistente (generando repetidamente objetivos con objetos que no incluye en la lista de elementos del mundo), los tres reintentos fallarán y el pipeline fallará. La validación \verb|verify_objective_completability()| detecta correctamente estos problemas, pero no puede corregirlos automáticamente como sí hace \verb|verify_puzzle_rewards_and_fix()| con los puzles (volveremos a esto más adelante, al detallar la clase Puzzle en el contexto de implementación). El modelo puede omitir un objeto importante del objetivo en \verb|world.items| aunque lo referencie en \verb|objective.components|, y las instrucciones del prompt no siempre son suficientes para prevenir esta inconsistencia.
 
 Como se discutirá en el Capítulo \ref{cap:evaluacion}, esta fragilidad resultó en algunos mundos que, tras agotar los reintentos, pasaron las validaciones pero presentaron problemas sutiles durante el juego real, evidenciando que la validación post-generación no puede compensar completamente la inconsistencia inherente del modelo durante la generación.
 
-Implementamos serialización completa del estado usando la biblioteca jsonpickle, guardando el mundo en el turno 0 con todas las referencias de objetos. Un \textbf{turno} representa una iteración completa del ciclo de juego: el par formado por la acción del jugador y la respuesta del sistema. El \textbf{turno 0} es especial porque representa el estado inicial del mundo antes de cualquier interacción del jugador, incluyendo la narración inicial que describe la escena de apertura. Este JSON permitió detectar inconsistencias que no eran inmediatamente visibles durante el juego (puzzles existentes pero no presentados, recompensas mencionadas pero no estructuradas). Por ejemplo, identificamos casos donde un objeto faltaba en \verb|world.items| pese a estar en \verb|objective.components|, lo cual era invisible durante el juego pero inmediato al inspeccionar el JSON.
+Implementamos serialización completa del estado usando la biblioteca jsonpickle, guardando el mundo en el turno 0 con todas las referencias de objetos. Un \textbf{turno} representa una iteración completa del ciclo de juego: el par formado por la acción del jugador y la respuesta del sistema. El \textbf{turno 0} es especial porque representa el estado inicial del mundo antes de cualquier interacción del jugador, incluyendo la narración inicial que describe la escena de apertura. Este JSON permitió detectar inconsistencias que no eran inmediatamente visibles durante el juego (puzles existentes pero no presentados, recompensas mencionadas pero no estructuradas). Por ejemplo, identificamos casos donde un objeto faltaba en \verb|world.items| pese a estar en \verb|objective.components|, lo cual era invisible durante el juego pero inmediato al inspeccionar el JSON.
 
 Tras el Paso 4, se verifica tamaño del mundo, conectividad y completabilidad del objetivo. Si estas validaciones finales fallan, se emiten advertencias pero no se rechaza el mundo porque ya se alcanzó el límite de intentos. En la práctica, estas validaciones rara vez fallan si las validaciones intermedias fueron exitosas, ya que los problemas críticos habrán sido detectados y corregidos en etapas anteriores.
 
@@ -615,7 +615,7 @@ El \verb|game_loop| procesa cada acción del jugador mediante una secuencia de s
 
 Es importante aclarar que ``segundo modelo de lenguaje'' se refiere a una segunda instancia o configuración del mismo modelo base, no necesariamente a un modelo arquitectónicamente diferente. Esta separación permite usar prompts y parámetros especializados para cada tarea: uno optimizado para razonamiento estructurado y otro para generación narrativa fluida.
 
-En la descripción anterior mencionamos \verb|WorldUpdate|, que representa las transformaciones que el modelo de lenguaje propone aplicar al mundo basándose en la acción del jugador. También mencionamos el estado formateado del mundo, que es una representación textual del estado simbólico actual (p. ej.: ubicación del jugador, inventario, objetos visibles, personajes presentes, puzzles activos) que se incluye en el prompt para que el modelo tenga contexto completo al generar respuestas.
+En la descripción anterior mencionamos \verb|WorldUpdate|, que representa las transformaciones que el modelo de lenguaje propone aplicar al mundo basándose en la acción del jugador. También mencionamos el estado formateado del mundo, que es una representación textual del estado simbólico actual (p. ej.: ubicación del jugador, inventario, objetos visibles, personajes presentes, puzles activos) que se incluye en el prompt para que el modelo tenga contexto completo al generar respuestas.
 
 \subsection{Acciones Rápidas (Quick Actions)} \label{sec:acciones_rapidas}
 
@@ -624,7 +624,7 @@ Implementamos acciones que responden sin invocar al modelo de lenguaje, procesá
 \begin{itemize}
     \item \textbf{Ver objetivo}: Muestra \verb|objective.description| directamente desde la estructura del mundo, con progreso de pistas descubiertas para objetivos de tipo misterio (por ejemplo: ``2 de 4 pistas descubiertas'')
     \item \textbf{Solicitar ayuda}: Activa el sistema de hints adaptativo que describiremos en la Sección \ref{sec:sistema_hints}
-    \item \textbf{Inspeccionar mundo} (modo desarrollo): Muestra estadísticas del grafo de ubicaciones y puzzles, útil para verificar la estructura generada
+    \item \textbf{Inspeccionar mundo} (modo desarrollo): Muestra estadísticas del grafo de ubicaciones y puzles, útil para verificar la estructura generada
     \item \textbf{Resumen} (modo desarrollo): Lista todas las ubicaciones con sus conexiones e inventarios, proporcionando una vista completa del estado del mundo
 \end{itemize}
 
@@ -632,9 +632,9 @@ Las acciones de desarrollo (inspeccionar y resumen) son funciones lógicas rutin
 
 \subsection{Sistema de Pistas Adaptativo} \label{sec:sistema_hints}
 
-El sistema de pistas adaptativo ajusta dinámicamente las sugerencias según la situación inmediata del jugador, implementado mediante \verb|world.update_hints()|. Este sistema opera de la siguiente manera: cuando el jugador está en una ubicación donde no hay puzzles presentes, ofrece pistas relacionadas con el objetivo principal (\verb|objective_hints|); si hay un puzzle en la ubicación pero aún no ha sido presentado al jugador, usa la pista de interacción (\verb|interaction_hint|) que sugiere cómo comenzar la acción (p. ej.: ``intenta hablar con el guardián'' o ``examina la inscripción en la pared''); una vez que el puzzle ha sido presentado al jugador pero no resuelto, cambia automáticamente a las pistas específicas de ese puzzle (\verb|puzzle_hints|).
+El sistema de pistas adaptativo ajusta dinámicamente las sugerencias según la situación inmediata del jugador, implementado mediante \verb|world.update_hints()|. Este sistema opera de la siguiente manera: cuando el jugador está en una ubicación donde no hay puzles presentes, ofrece pistas relacionadas con el objetivo principal (\verb|objective_hints|); si hay un puzle en la ubicación pero aún no ha sido presentado al jugador, usa la pista de interacción (\verb|interaction_hint|) que sugiere cómo comenzar la acción (p. ej.: ``intenta hablar con el guardián'' o ``examina la inscripción en la pared''); una vez que el puzle ha sido presentado al jugador pero no resuelto, cambia automáticamente a las pistas específicas de ese puzle (\verb|puzzle_hints|).
 
-Las pistas están siempre en cantidad de tres y se entregan en orden ascendente de especificidad, proporcionando ayuda progresiva. El sistema rastrea qué pistas han sido entregadas mediante un atributo \verb|given| en cada pista. El mecanismo se actualiza automáticamente cuando el jugador cambia de ubicación, cuando se propone un puzzle, o cuando se resuelve un puzzle.
+Las pistas están siempre en cantidad de tres y se entregan en orden ascendente de especificidad, proporcionando ayuda progresiva. El sistema rastrea qué pistas han sido entregadas mediante un atributo \verb|given| en cada pista. El mecanismo se actualiza automáticamente cuando el jugador cambia de ubicación, cuando se propone un puzle, o cuando se resuelve un puzle.
 
 \subsection{Intervenciones Deterministas del Sistema}
 
@@ -643,15 +643,15 @@ Todas estas verificaciones ilustran una característica fundamental de nuestro e
 Implementamos intervenciones simbólicas para mecánicas críticas donde confiar en el modelo de lenguaje resultó poco confiable:
 
 \begin{itemize}
-    \item \textbf{Proposición forzada de puzzles}: Si la entrada del jugador menciona a un personaje que tiene un puzzle asociado, el sistema intercepta la acción y narra automáticamente la proposición del puzzle usando el texto predefinido, sin consultar al modelo
-    \item \textbf{Entrega automática de recompensas}: Cuando el jugador resuelve un puzzle, la función \verb|_apply_puzzle_rewards| verifica las recompensas estructuradas y mueve automáticamente los ítems al inventario del jugador
+    \item \textbf{Proposición forzada de puzles}: Si la entrada del jugador menciona a un personaje que tiene un puzle asociado, el sistema intercepta la acción y narra automáticamente la proposición del puzle usando el texto predefinido, sin consultar al modelo
+    \item \textbf{Entrega automática de recompensas}: Cuando el jugador resuelve un puzle, la función \verb|_apply_puzzle_rewards| verifica las recompensas estructuradas y mueve automáticamente los objetos al inventario del jugador
     \item \textbf{Desbloqueo automático de pasajes}: Los pasajes bloqueados que requieren condiciones cumplidas se desbloquean automáticamente sin necesidad de que el modelo lo genere en la narración
-    \item \textbf{Descubrimiento de pistas de misterio}: Para objetivos de tipo misterio, el sistema analiza la narración generada y, si detecta interacción con un ítem asociado a una pista, marca automáticamente la pista como descubierta
+    \item \textbf{Descubrimiento de pistas de misterio}: Para objetivos de tipo misterio, el sistema analiza la narración generada y, si detecta interacción con un objeto asociado a una pista, marca automáticamente la pista como descubierta
 \end{itemize}
 
 \subsection{Verificación de Completitud del Objetivo}
 
-La función \verb|check_objective_completion| evalúa en cada turno si el objetivo ha sido alcanzado, con verificaciones específicas por tipo de objetivo. Por ejemplo, para \verb|GET_ITEM|, verifica que el ítem objetivo esté en el inventario del jugador; para \verb|REACH_LOCATION|, verifica que la ubicación actual del jugador coincida con la ubicación objetivo. Para \verb|FIND_CHARACTER|, verifica que el jugador esté en la misma ubicación que el personaje objetivo. Para \verb|DELIVER_AN_ITEM|, verifica que el ítem haya sido entregado al destinatario correcto. Para \verb|SOLVE_MYSTERY|, verifica que todas las pistas hayan sido descubiertas.
+La función \verb|check_objective_completion| evalúa en cada turno si el objetivo ha sido alcanzado, con verificaciones específicas por tipo de objetivo. Por ejemplo, para \verb|GET_ITEM|, verifica que el objeto objetivo esté en el inventario del jugador; para \verb|REACH_LOCATION|, verifica que la ubicación actual del jugador coincida con la ubicación objetivo. Para \verb|FIND_CHARACTER|, verifica que el jugador esté en la misma ubicación que el personaje objetivo. Para \verb|DELIVER_AN_ITEM|, verifica que el objeto haya sido entregado al destinatario correcto. Para \verb|SOLVE_MYSTERY|, verifica que todas las pistas hayan sido descubiertas.
 
 Al completarse el objetivo, el sistema presenta la narración de cierre (ya sea \verb|completion_narration| para objetivos estándar o \verb|mystery_solution| para objetivos de misterio) y registra el éxito en el log de la partida. La detección de completitud es puramente simbólica, basándose en verificaciones del estado estructurado del mundo, no en interpretaciones del modelo de lenguaje que podrían ser ambiguas o incorrectas.
 
@@ -659,7 +659,7 @@ Esta sección sobre el ciclo de juego es fundamental porque conecta todos los co
 
 \section{Sistema de Memoria Persistente con RAG}
 
-Los modelos de lenguaje son fundamentalmente sin estado: cada invocación recibe solamente el contexto del prompt actual y no tiene acceso a interacciones previas. Para narrativas interactivas largas esto representa un problema crítico: el jugador puede resolver un puzzle, hablar con un personaje o descubrir información importante en el turno 5, pero para el turno 20 el modelo no tiene acceso a ese contexto a menos que lo incluyamos explícitamente en el prompt. Incluir todo el historial completo en cada prompt rápidamente excede los límites de longitud de contexto y aumenta significativamente los costos computacionales de cada invocación.
+Los modelos de lenguaje son fundamentalmente sin estado: cada invocación recibe solamente el contexto del prompt actual y no tiene acceso a interacciones previas. Para narrativas interactivas largas esto representa un problema crítico: el jugador puede resolver un puzle, hablar con un personaje o descubrir información importante en el turno 5, pero para el turno 20 el modelo no tiene acceso a ese contexto a menos que lo incluyamos explícitamente en el prompt. Incluir todo el historial completo en cada prompt rápidamente excede los límites de longitud de contexto y aumenta significativamente los costos computacionales de cada invocación.
 
 Para intentar resolver este problema, implementamos un sistema \textbf{RAG} (\textit{Retrieval-Augmented Generation}, Generación Aumentada por Recuperación) con memoria episódica. RAG es una técnica que combina recuperación de información con generación de texto: primero busca información relevante en una base de datos y luego la inyecta en el prompt del modelo para enriquecer su respuesta. Es importante aclarar que RAG no es un proceso simbólico sino estadístico, por lo que puede fallar. No obstante, consideramos que se justifica implementarlo porque el sistema simbólico por sí solo no puede mantener un historial narrativo coherente de todos los eventos pasados sin exceder los límites de longitud del prompt. RAG permite seleccionar los recuerdos más relevantes para cada acción, lo cual fue una diferencia notable con respecto a PAYADOR original, pero no con tanto impacto como esparábamos. Al final, la única utilidad que tuvo el RAG fue con respecto a la narración; el sistema es capaz de recordar eventos pasados y hacer alusión a ellos. Como veremos en la parte de experimentación, algunos jugadores destacaron esto como algo muy positivo.
 
@@ -863,7 +863,7 @@ Finalmente, el modo \texttt{replay} permite cargar partidas guardadas desde Mong
 
 Streamlit usa un modelo de ejecución stateless donde cada interacción re-ejecuta el script completo. Manejamos estado persistente mediante \verb|st.session_state|, un diccionario que sobrevive entre ejecuciones. Almacenamos allí el objeto \verb|World|, el \verb|game_loop|, el historial de chat, ubicaciones visitadas, configuración de idioma y modo de generación.
 
-Ya que cada interacción puede modificar el estado, también implementamos inicialización condicional al inicio del script: verificamos existencia de cada clave en \verb|session_state| antes de crear valores default. Por ejemplo, usando código similar a \verb|if 'world' not in st.session_state: st.session_state.world = None|. Esta inicialización lazy previene resetear estado cuando el usuario interactúa con otros widgets (los widgets son los componentes interactivos de la interfaz como botones, campos de texto y selectores).
+Ya que cada interacción puede modificar el estado, también implementamos inicialización condicional al inicio del código: verificamos existencia de cada clave antes de crear valores por defecto. Esta inicialización lazy previene resetear estado cuando el usuario interactúa con otros widgets (los widgets son los componentes interactivos de la interfaz como botones, campos de texto y selectores).
 
 \subsection{Interfaz de Chat Conversacional}
 
@@ -871,7 +871,7 @@ El núcleo de la UI es una interfaz de chat implementada con \verb|st.chat_messa
 
 \subsection{Visualización del Grafo con Mermaid.js}
 
-Generamos visualizaciones del mundo como diagramas de grafo usando sintaxis Mermaid. El módulo \verb|world_visualizer.py| exporta el mundo a formato Mermaid\footnote{\url{https://mermaid.js.org/}}, que es una biblioteca JavaScript para crear diagramas a partir de definiciones textuales. La función \verb|render_mermaid()| en la UI lo renderiza mediante una página HTML embebida con Mermaid.js desde CDN. Esta visualización permite al usuario (o a nosotros durante el desarrollo) ver la estructura completa del mundo como un grafo navegable. Incluimos un screenshot de esta funcionalidad en la Figura \ref{fig:mermaid_viz}, que ilustra cómo el concepto neurosimbólico permite tanto generar contenido mediante el modelo como validar y visualizar su estructura mediante el sistema simbólico.
+Generamos visualizaciones del mundo como diagramas de grafo usando sintaxis Mermaid. Un módulo especializado exporta el mundo a formato Mermaid\footnote{\url{https://mermaid.js.org/}}, que es una biblioteca JavaScript para crear diagramas a partir de definiciones textuales. La función \verb|render_mermaid()| en la UI lo renderiza mediante una página HTML embebida con Mermaid.js desde CDN. Esta visualización permite al usuario (o a nosotros durante el desarrollo) ver la estructura completa del mundo como un grafo navegable. Incluimos un screenshot de esta funcionalidad en la Figura \ref{fig:mermaid_viz}, que ilustra cómo el concepto neurosimbólico permite tanto generar contenido mediante el modelo como validar y visualizar su estructura mediante el sistema simbólico.
 
 \begin{figure}[h]
     \centering
