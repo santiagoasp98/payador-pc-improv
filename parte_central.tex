@@ -521,7 +521,7 @@ Los componentes de implementación que abordaremos son:
 \begin{itemize}
     \item \textbf{Integración con modelos de lenguaje}: Uso de la biblioteca Pydantic para garantizar salidas estructuradas del modelo, validaciones automáticas y manejo de errores.
     \item \textbf{Orquestación del pipeline}: La función \verb|create_world_incrementally()| que coordina la ejecución secuencial de las cinco etapas, con sistema de reintentos y validaciones intermedias.
-    \item \textbf{Lógica de juego y ciclo de interacción}: El game loop que combina generación narrativa del modelo con intervenciones deterministas del sistema simbólico.
+    \item \textbf{Lógica de juego y ciclo de interacción}: El \textit{game loop} que combina generación narrativa del modelo con intervenciones deterministas del sistema simbólico.
     \item \textbf{Sistema de memoria con RAG}: Implementación de memoria episódica persistente usando embeddings de Gemini y ChromaDB como base vectorial.
     \item \textbf{Persistencia de trazas con MongoDB}: Serialización completa del estado del mundo para reproducibilidad y análisis.
     \item \textbf{Interfaz de usuario con Streamlit}: Implementación de la interfaz web que permite a los jugadores interactuar con los mundos generados.
@@ -578,7 +578,7 @@ Ahora que el contexto de PAYADOR está definido mediante las estructuras de clas
 La función \verb|create_world_incrementally()| coordina la ejecución secuencial de las cinco etapas del pipeline, manteniendo una única instancia del modelo de lenguaje y solicitando estructuras Pydantic específicas en cada etapa. Para cada etapa del pipeline, es importante tener en cuenta cuál era su propósito según lo definido en la Sección \ref{sec:pipeline}:
 
 \begin{itemize}
-    \item \textbf{Etapa 1} (Concepto del mundo): Genera título, backstory, concepto del jugador y objetivo
+    \item \textbf{Etapa 1} (Concepto del mundo): Genera título, \textit{backstory}, concepto del jugador y objetivo
     \item \textbf{Etapa 2} (Esqueleto): Identifica entidades clave con cantidades configuradas
     \item \textbf{Etapa 3} (Mundo jugable): Materializa el esqueleto con detalles y conexiones
     \item \textbf{Etapa 4} (Desafíos): Introduce puzles y pasajes bloqueados
@@ -601,7 +601,7 @@ Tras la Etapa 4, se verifica tamaño del mundo, conectividad y completabilidad d
 
 \section{Lógica de Juego y Ciclo de Interacción} \label{sec:logica_juego}
 
-Es importante explicar por qué el ciclo de interacción (game loop) es necesario antes de describirlo. Un ciclo de juego coordina la secuencia repetitiva de acciones que constituyen la experiencia del jugador: recibir entrada, procesarla, actualizar el estado del mundo, generar retroalimentación narrativa y verificar condiciones de victoria o derrota. Sin este ciclo, el sistema no podría mantener coherencia entre turnos ni gestionar la progresión del jugador hacia el objetivo.
+Es importante explicar por qué el ciclo de interacción (\textit{game loop}) es necesario antes de describirlo. Un ciclo de juego coordina la secuencia repetitiva de acciones que constituyen la experiencia del jugador: recibir entrada, procesarla, actualizar el estado del mundo, generar retroalimentación narrativa y verificar condiciones de victoria o derrota. Sin este ciclo, el sistema no podría mantener coherencia entre turnos ni gestionar la progresión del jugador hacia el objetivo.
 
 La lógica de juego implementa un ciclo que combina generación narrativa del modelo de lenguaje con intervenciones deterministas del sistema simbólico. Este enfoque busca generar un equilibrio, aprovechando la potencial capacidad del modelo para generar narrativas que puedan percibirse como ricas y creativas. Además, busca también responder a acciones impredecibles del jugador sin dejarlo completamente responsable de las mecánicas críticas del juego que, como observamos durante el desarrollo, frecuentemente olvida o ejecuta incorrectamente.
 
@@ -670,7 +670,7 @@ El sistema se compone de cuatro componentes que trabajan coordinadamente: \verb|
     \label{fig:rag_overview}
 \end{figure}
 
-\verb|AtomicMemory| encapsula la información de un turno de juego: número de turno, acción del jugador, narración resultante, resumen del estado del mundo y timestamp. El término ``cada memoria'' en este contexto se refiere a una instancia de \verb|AtomicMemory| que representa un turno completo. Cada memoria puede serializarse a texto mediante \verb|to_text()| para generar embeddings, o a diccionario mediante \verb|to_dict()| para el almacenamiento en ChromaDB. La serialización a diccionario aplana metadatos a tipos primitivos (p. ej.: strings, ints, floats, bools) porque ChromaDB no soporta estructuras anidadas complejas en sus metadatos.
+\verb|AtomicMemory| encapsula la información de un turno de juego: número de turno, acción del jugador, narración resultante, resumen del estado del mundo y \textit{timestamp}. El término ``cada memoria'' en este contexto se refiere a una instancia de \verb|AtomicMemory| que representa un turno completo. Cada memoria puede serializarse a texto mediante \verb|to_text()| para generar embeddings, o a diccionario mediante \verb|to_dict()| para el almacenamiento en ChromaDB. La serialización a diccionario aplana metadatos a tipos primitivos (p. ej.: strings, ints, floats, bools) porque ChromaDB no soporta estructuras anidadas complejas en sus metadatos.
 
 \verb|EmbeddingService| genera representaciones vectoriales densas usando el modelo de embeddings \verb|gemini-embedding-001| de Google. Configuramos el servicio con \verb|task_type="RETRIEVAL_DOCUMENT"| y \verb|output_dimensionality=768|, obteniendo embeddings de 768 dimensiones que capturan el significado semántico del texto. Aplicamos normalización L2 a los vectores resultantes como recomienda la documentación oficial de Gemini\footnote{\url{https://ai.google.dev/gemini-api/docs/embeddings}}, lo cual mejora la calidad de las búsquedas por similitud coseno.
 
@@ -678,7 +678,7 @@ La decisión de usar word embeddings por sobre métodos de búsqueda léxica tra
 
 \verb|MemoryStore| maneja la persistencia mediante ChromaDB, una base de datos vectorial diseñada para aplicaciones de embeddings. Creamos un \verb|PersistentClient| que escribe en disco (directorio \verb|gamelogs/memory_db|) para que las memorias persistan entre sesiones. Cada mundo de juego tiene su propia colección identificada por \verb|world_id|.
 
-El método \verb|add_memory()| almacena exactamente tres elementos por cada memoria: el embedding vectorial para búsquedas de similitud, el documento de texto para recuperación legible, y los metadatos estructurados para filtrado y reconstrucción. Cada memoria recibe un ID único basado en turno y timestamp (\verb|turn_{turn_number}_{timestamp}|).
+El método \verb|add_memory()| almacena exactamente tres elementos por cada memoria: el embedding vectorial para búsquedas de similitud, el documento de texto para recuperación legible, y los metadatos estructurados para filtrado y reconstrucción. Cada memoria recibe un ID único basado en turno y \textit{timestamp} (\verb|turn_{turn_number}_{timestamp}|).
 
 \verb|search_memories()| ejecuta búsquedas por similitud coseno usando un query embedding como entrada y devolviendo las top-k memorias más relevantes. ChromaDB ordena los resultados por score de similitud automáticamente, priorizando memorias semánticamente cercanas a la acción actual.
 
@@ -706,7 +706,7 @@ Este contexto adicional mejora la recuperación posterior: si el jugador pregunt
 
 \subsection{Integración con el Ciclo de Juego}
 
-Integramos el sistema RAG en dos puntos del ciclo de turno en \verb|game_logic.py|. Antes de procesar la acción del jugador, llamamos a \verb|retrieve_relevant_memories()| con el input actual, obtenemos las top-3 memorias más relevantes y las formateamos para inclusión en el prompt mediante \verb|format_memories_for_prompt()|. El prompt utilizado (disponible en el Anexo \ref{anexo:prompts}) incluye una sección denominada ``Recuerdos Relevantes del Pasado'' (en inglés: ``Relevant Past Memories'', dependiendo del idioma de la partida) que precede al estado actual del mundo, con instrucciones explícitas al modelo de considerar esos eventos pasados al generar la respuesta.
+Integramos el sistema RAG en dos puntos del ciclo de turno en \verb|game_logic.py|. Antes de procesar la acción del jugador, llamamos a \verb|retrieve_relevant_memories()| con esa entrada, obtenemos las top-3 memorias más relevantes y las formateamos para inclusión en el prompt mediante \verb|format_memories_for_prompt()|. El prompt utilizado (disponible en el Anexo \ref{anexo:prompts}) incluye una sección denominada ``Recuerdos Relevantes del Pasado'' (en inglés: ``Relevant Past Memories'', dependiendo del idioma de la partida) que precede al estado actual del mundo, con instrucciones explícitas al modelo de considerar esos eventos pasados al generar la respuesta.
 
 Después de procesar exitosamente el turno, ejecutamos \verb|ingest_memory()| con el número de turno, acción del jugador, narración generada y resumen del estado del mundo. Esta ingestión post-turno asegura que cada memoria refleja el resultado final después de aplicar cambios estructurados al mundo, no predicciones intermedias.
 
@@ -735,11 +735,11 @@ Cada partida se almacena como un documento MongoDB con la siguiente estructura:
     \item \verb|narrative_model_name|: Nombre del modelo usado para narración
     \item \verb|reasoning_model_name|: Nombre del modelo usado para razonamiento
     \item \verb|inspiration|: Tema o frase inspiradora si se usó el modo \texttt{inspiration} (vacío en otros modos)
-    \item \verb|created_at|: Timestamp de creación de la partida
+    \item \verb|created_at|: \textit{Timestamp} de creación de la partida
     \item \verb|turns|: Objeto anidado con turnos indexados numéricamente (0, 1, 2, ...)
 \end{itemize}
 
-Cada entrada en \verb|turns| es un subdocumento que captura el estado completo de ese turno: fecha/hora, input del usuario, estado simbólico del mundo pre-turno (serializado con jsonpickle), estado renderizado del mundo pre-turno en forma de texto legible para humanos, predicciones del modelo, cambios estructurados aplicados y narración resultante.
+Cada entrada en \verb|turns| es un subdocumento que captura el estado completo de ese turno: fecha/hora, \textit{input} del usuario, estado simbólico del mundo pre-turno (serializado con jsonpickle), estado renderizado del mundo pre-turno en forma de texto legible para humanos, predicciones del modelo, cambios estructurados aplicados y narración resultante.
 
 \subsection{Concepto de Turno}
 
@@ -837,17 +837,17 @@ Diseñamos cinco modos de generación de mundos que ofrecen diferentes niveles d
 
 \subsubsection{Modo Inspiration}
 
-El modo \texttt{inspiration} permite al usuario proporcionar una frase o temática que inspira la generación del mundo, como definimos en la Sección \ref{sec:pipeline} del capítulo anterior. Implementamos un campo de texto donde el usuario ingresa conceptos (p. ej.: ``el misterio sobre el robo del cuadro'' o ``exploración espacial en una estación abandonada''). Este input se pasa directamente como parámetro \verb|theme| a \verb|run_step_1_concept()|, como se explicó en el Capítulo \ref{cap:diseno}.
+El modo \texttt{inspiration} permite al usuario proporcionar una frase o temática que inspira la generación del mundo, como definimos en la Sección \ref{sec:pipeline} del capítulo anterior. Implementamos un campo de texto donde el usuario ingresa conceptos (p. ej.: ``el misterio sobre el robo del cuadro'' o ``exploración espacial en una estación abandonada''). Esta entrada se pasa directamente como parámetro \verb|theme| a \verb|run_step_1_concept()|, como se explicó en el Capítulo \ref{cap:diseno}.
 
 Agregamos sugerencias populares predefinidas como botones que, al ser seleccionados, completan automáticamente el campo de texto con descripciones más detalladas. Esta funcionalidad reduce la barrera de entrada para usuarios que no tienen clara una temática inicial.
 
-Cuando generamos el mundo desde un texto de inspiración (correspondiente al modo \texttt{inspiration} detallado en la Sección \ref{sec:modos_juego}), el sistema ejecuta las cuatro etapas del pipeline de forma secuencial con feedback visual. Cada etapa muestra su mensaje de progreso (p. ej.: ``Etapa 1: Generando concepto del mundo...''), actualiza una barra de progreso y muestra mensajes de confirmación con detalles. Este feedback permite informarle al usuario sobre el proceso que se está ejecutando, durante los 30-60 segundos que típicamente toma la generación completa.
+Cuando generamos el mundo desde un texto de inspiración (correspondiente al modo \texttt{inspiration} detallado en la Sección \ref{sec:modos_juego}), el sistema ejecuta las cuatro etapas del pipeline de forma secuencial con indicaciones visuales del progreso. Cada etapa muestra su mensaje de progreso (p. ej.: ``Etapa 1: Generando concepto del mundo...''), actualiza una barra de progreso y muestra mensajes de confirmación con detalles. Este \textit{feedback} permite informarle al usuario sobre el proceso que se está ejecutando, durante los 30-60 segundos que típicamente toma la generación completa.
 
 \subsubsection{Modo Generate}
 
-El modo \texttt{generate} crea mundos completamente aleatorios sin input del usuario, como se describió en la Sección \ref{sec:pipeline}. Este modo solicita al modelo proponer un tema original y luego procede con el pipeline completo. Observamos durante el desarrollo que este modo produce mundos variados e inesperados, aunque el conjunto de conceptos que el modelo maneja es relativamente limitado, porque notamos repetición de conceptos, personajes o lugares. Probablemente esto esté relacionado con el caché que el modelo mantiene (información que el modelo reutiliza entre solicitudes para optimizar rendimiento). Como se alinea con la limitación que tienen los modelos al generar narrativa con temáticas diferentes \cite{garcia2024payador, ammanabrolu2024letter}, esta falta de variación temática es un problema conocido en el campo.
+El modo \texttt{generate} crea mundos completamente aleatorios sin entrada del usuario, como se describió en la Sección \ref{sec:pipeline}. Este modo solicita al modelo proponer un tema original y luego procede con el pipeline completo. Observamos durante el desarrollo que este modo produce mundos variados e inesperados, aunque el conjunto de conceptos que el modelo maneja es relativamente limitado, porque notamos repetición de conceptos, personajes o lugares. Probablemente esto esté relacionado con el caché que el modelo mantiene (información que el modelo reutiliza entre solicitudes para optimizar rendimiento). Como se alinea con la limitación que tienen los modelos al generar narrativa con temáticas diferentes \cite{garcia2024payador, ammanabrolu2024letter}, esta falta de variación temática es un problema conocido en el campo.
 
-El botón único ``Generate Random World'' reduce las barreras de entrada para el usuario, ya que no requiere proporcionar ningún input inicial. Esta simplicidad resulta especialmente útil durante el desarrollo, permitiendo iteraciones rápidas de prueba sin necesidad de configuración previa.
+El botón único ``Generate Random World'' reduce las barreras de entrada para el usuario, ya que no requiere proporcionar ninguna entrada inicial. Esta simplicidad resulta especialmente útil durante el desarrollo, permitiendo iteraciones rápidas de prueba sin necesidad de configuración previa.
 
 \subsubsection{Modo Preset}
 
